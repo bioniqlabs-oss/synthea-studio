@@ -2,12 +2,24 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Java for Synthea
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
+    wget \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
+
+# Download Synthea JAR
+ENV SYNTHEA_VERSION=master-branch-latest
+RUN mkdir -p /app/synthea && \
+    wget -O /app/synthea/synthea-with-dependencies.jar \
+    https://github.com/synthetichealth/synthea/releases/download/${SYNTHEA_VERSION}/synthea-with-dependencies.jar && \
+    chmod +x /app/synthea/synthea-with-dependencies.jar
+
+# Verify Synthea installation
+RUN java -jar /app/synthea/synthea-with-dependencies.jar --help || true
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -15,9 +27,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ app/
+COPY alembic.ini .
+COPY alembic/ alembic/
 
-# Create storage directory
-RUN mkdir -p /var/lib/synthea-studio/storage
+# Create storage directories
+RUN mkdir -p /var/lib/synthea-studio/storage \
+    && mkdir -p /tmp/synthea-output
+
+# Set environment variables
+ENV SYNTHEA_JAR_PATH=/app/synthea/synthea-with-dependencies.jar
+ENV SYNTHEA_OUTPUT_PATH=/tmp/synthea-output
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
