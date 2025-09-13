@@ -114,6 +114,7 @@ async def create_population(
         id=population_id,
         name=data.name,
         description=data.description,
+        patient_count=data.size,  # Store the requested size
         config=data.config,
         status=PopulationStatus.PENDING
     )

@@ -11,14 +11,14 @@ Synthea Studio provides a modern web interface for configuring and generating sy
 
 ## Features
 
-- 🏥 **Visual Population Builder** - Configure demographics, conditions, and modules through an intuitive UI
-- 👥 **Population Management** - Track, organize, and manage multiple synthetic populations
-- 📊 **Real-time Progress** - Monitor generation progress with WebSocket updates
-- 🗂️ **Batch Operations** - Generate, delete, or export populations in bulk
-- 📋 **Pre-built Templates** - Start quickly with templates for common research scenarios
-- 🔄 **Job Tracking** - Full audit trail of generation jobs with configurations and logs
-- 💾 **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
-- 🚀 **Async Processing** - Non-blocking generation using Celery workers
+- **Visual Population Builder** - Configure demographics, conditions, and modules through an intuitive UI
+- **Population Management** - Track, organize, and manage multiple synthetic populations
+- **Real-time Progress** - Monitor generation progress with WebSocket updates
+- **Batch Operations** - Generate, delete, or export populations in bulk
+- **Pre-built Templates** - Start quickly with templates for common research scenarios
+- **Job Tracking** - Full audit trail of generation jobs with configurations and logs
+- **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
+- **Async Processing** - Non-blocking generation using Celery workers
 
 ## Quick Start
 
@@ -231,9 +231,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Support
 
-- 📖 [Documentation](https://synthea-studio.github.io/docs)
-- 💬 [Discussions](https://github.com/synthea-studio/synthea-studio/discussions)
-- 🐛 [Issue Tracker](https://github.com/synthea-studio/synthea-studio/issues)
+- [Documentation](https://synthea-studio.github.io/docs)
+- [Discussions](https://github.com/synthea-studio/synthea-studio/discussions)
+- [Issue Tracker](https://github.com/synthea-studio/synthea-studio/issues)
 
 ## Roadmap
 

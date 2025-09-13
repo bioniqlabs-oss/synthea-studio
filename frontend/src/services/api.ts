@@ -210,29 +210,25 @@ export const templateApi = {
         id: 'diabetes-study',
         name: 'Diabetes Study Population',
         description: 'Population focused on Type 2 diabetes patients',
-        size: 100,
-        thumbnail: '🩺'
+        size: 100
       },
       {
         id: 'pediatric-asthma',
         name: 'Pediatric Asthma Cohort',
         description: 'Children with asthma and allergic conditions',
-        size: 50,
-        thumbnail: '👶'
+        size: 50
       },
       {
         id: 'general-population',
         name: 'General Population',
         description: 'Diverse general population baseline',
-        size: 200,
-        thumbnail: '👥'
+        size: 200
       },
       {
         id: 'cardiovascular-risk',
         name: 'Cardiovascular Risk',
         description: 'High risk for cardiovascular events',
-        size: 75,
-        thumbnail: '❤️'
+        size: 75
       }
     ];
   },

@@ -111,19 +111,19 @@ export default function Dashboard() {
           to="/new"
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
         >
-          ➕ New Population
+          New Population
         </Link>
         <Link
           to="/templates"
           className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
         >
-          📋 Browse Templates
+          Browse Templates
         </Link>
         <button
           onClick={() => refetch()}
           className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
         >
-          🔄 Refresh
+          Refresh
         </button>
       </div>
 
@@ -162,7 +162,7 @@ export default function Dashboard() {
           {populationsByStatus.generating.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                🔄 Currently Generating
+                Currently Generating
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {populationsByStatus.generating.map((population) => (
@@ -180,7 +180,7 @@ export default function Dashboard() {
           {populationsByStatus.pending.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                ⏳ Pending
+                Pending
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {populationsByStatus.pending.map((population) => (
@@ -198,7 +198,7 @@ export default function Dashboard() {
           {populationsByStatus.completed.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                ✅ Completed
+                Completed
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {populationsByStatus.completed.map((population) => (
@@ -216,7 +216,7 @@ export default function Dashboard() {
           {populationsByStatus.failed.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                ❌ Failed
+                Failed
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {populationsByStatus.failed.map((population) => (

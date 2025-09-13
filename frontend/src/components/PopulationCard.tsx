@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { populationApi } from '../services/api';
 import type { Population } from '../services/api';
+import { formatDateTime, getRelativeTime } from '../utils/dateFormat';
 
 interface PopulationCardProps {
   population: Population;
@@ -18,11 +19,11 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
     failed: 'bg-red-100 text-red-800',
   };
   
-  const statusIcons = {
-    pending: '⏳',
-    generating: '🔄',
-    completed: '✅',
-    failed: '❌',
+  const statusLabels = {
+    pending: 'Pending',
+    generating: 'Generating',
+    completed: 'Completed',
+    failed: 'Failed',
   };
   
   const handleDelete = async () => {
@@ -42,15 +43,6 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
     }
   };
   
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
   
   return (
     <div className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
@@ -69,18 +61,20 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
           
           <div className="mt-4 flex items-center gap-4 text-sm">
             <span className="text-gray-500">
-              👥 {population.patient_count.toLocaleString()} patients
+              {population.patient_count.toLocaleString()} patients
             </span>
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[population.status]}`}>
-              {statusIcons[population.status]} {population.status}
+              {statusLabels[population.status]}
             </span>
           </div>
           
           <div className="mt-2 text-xs text-gray-400">
-            Created: {formatDate(population.created_at)}
+            <span title={formatDateTime(population.created_at)}>
+              Created: {getRelativeTime(population.created_at)}
+            </span>
             {population.completed_at && (
-              <span className="block">
-                Completed: {formatDate(population.completed_at)}
+              <span className="block" title={formatDateTime(population.completed_at)}>
+                Completed: {getRelativeTime(population.completed_at)}
               </span>
             )}
           </div>
@@ -100,7 +94,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
             onClick={() => populationApi.export(population.id, 'fhir')}
             className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
           >
-            📥 Export
+            Export
           </button>
         )}
         
@@ -109,7 +103,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
             onClick={() => populationApi.startGeneration(population.id)}
             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
           >
-            ▶️ Start
+            Start
           </button>
         )}
         
@@ -118,7 +112,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
             onClick={() => populationApi.stopGeneration(population.id)}
             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700"
           >
-            ⏹️ Stop
+            Stop
           </button>
         )}
         
@@ -127,7 +121,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
           disabled={isDeleting || population.status === 'generating'}
           className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isDeleting ? '...' : '🗑️'} Delete
+          {isDeleting ? 'Deleting...' : 'Delete'}
         </button>
       </div>
     </div>

@@ -115,16 +115,13 @@ export default function Templates() {
             >
               <div className="p-6">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center">
-                    <span className="text-3xl mr-3">{template.thumbnail}</span>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">
-                        {template.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {template.size} patients
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {template.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {template.size} patients
+                    </p>
                   </div>
                   {isSelected && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -145,8 +142,8 @@ export default function Templates() {
                       </h4>
                       <ul className="mt-1 text-xs text-gray-600 space-y-1">
                         {details.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start">
-                            <span className="text-green-500 mr-1">✓</span>
+                          <li key={idx} className="pl-4 relative">
+                            <span className="absolute left-0 text-gray-400">•</span>
                             {feature}
                           </li>
                         ))}
@@ -159,8 +156,8 @@ export default function Templates() {
                       </h4>
                       <ul className="mt-1 text-xs text-gray-600 space-y-1">
                         {details.useCases.map((useCase, idx) => (
-                          <li key={idx} className="flex items-start">
-                            <span className="text-blue-500 mr-1">•</span>
+                          <li key={idx} className="pl-4 relative">
+                            <span className="absolute left-0 text-gray-400">•</span>
                             {useCase}
                           </li>
                         ))}
@@ -201,15 +198,15 @@ export default function Templates() {
         })}
       </div>
       
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-blue-900">
-          💡 Template Tips
+      <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-gray-900">
+          Template Information
         </h3>
-        <ul className="mt-2 text-sm text-blue-700 space-y-1">
-          <li>• Templates provide pre-configured settings for common research scenarios</li>
-          <li>• Use "Customize" to modify template settings before generation</li>
-          <li>• All templates use Synthea's validated disease models</li>
-          <li>• Generated populations include complete medical histories</li>
+        <ul className="mt-2 text-sm text-gray-600 space-y-1">
+          <li className="pl-4 relative"><span className="absolute left-0 text-gray-400">•</span> Templates provide pre-configured settings for common research scenarios</li>
+          <li className="pl-4 relative"><span className="absolute left-0 text-gray-400">•</span> Use "Customize" to modify template settings before generation</li>
+          <li className="pl-4 relative"><span className="absolute left-0 text-gray-400">•</span> All templates use Synthea's validated disease models</li>
+          <li className="pl-4 relative"><span className="absolute left-0 text-gray-400">•</span> Generated populations include complete medical histories</li>
         </ul>
       </div>
     </div>

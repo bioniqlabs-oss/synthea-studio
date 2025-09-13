@@ -19,6 +19,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Create enum type if it doesn't exist
+    conn = op.get_bind()
+    result = conn.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'populationstatus'"))
+    if not result.fetchone():
+        op.execute("CREATE TYPE populationstatus AS ENUM ('PENDING', 'GENERATING', 'COMPLETED', 'FAILED')")
+    
     # Create populations table
     op.create_table('populations',
         sa.Column('id', sa.String(), nullable=False),
@@ -26,7 +32,7 @@ def upgrade() -> None:
         sa.Column('description', sa.String(), nullable=True),
         sa.Column('patient_count', sa.Integer(), default=0),
         sa.Column('config', sa.JSON(), nullable=False),
-        sa.Column('status', sa.Enum('PENDING', 'GENERATING', 'COMPLETED', 'FAILED', name='populationstatus'), nullable=True),
+        sa.Column('status', postgresql.ENUM('PENDING', 'GENERATING', 'COMPLETED', 'FAILED', name='populationstatus', create_type=False), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('completed_at', sa.DateTime(), nullable=True),
         sa.Column('storage_path', sa.String(), nullable=True),

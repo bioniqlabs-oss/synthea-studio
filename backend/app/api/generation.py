@@ -9,6 +9,7 @@ import json
 from app.core.database import get_db
 from app.models import Population, GenerationJob
 from app.models.population import PopulationStatus
+from app.workers.celery_app import celery_app
 
 
 router = APIRouter()
@@ -34,8 +35,11 @@ async def start_generation(
             detail=f"Population is {population.status.value}, cannot start generation"
         )
     
-    # TODO: Start Celery task
-    # task = generate_population.delay(population_id)
+    # Start Celery task
+    task = celery_app.send_task(
+        'app.workers.generation_worker.generate_population',
+        args=[population_id, population.patient_count, dict(population.config)]
+    )
     
     # Update population status
     population.status = PopulationStatus.GENERATING
@@ -43,7 +47,7 @@ async def start_generation(
     # Create job record
     job = GenerationJob(
         population_id=population_id,
-        # celery_task_id=task.id
+        celery_task_id=task.id
     )
     
     db.add(job)

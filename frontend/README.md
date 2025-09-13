@@ -1,69 +1,132 @@
-# React + TypeScript + Vite
+# Synthea Studio Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React-based web interface for Synthea Studio population management.
 
-Currently, two official plugins are available:
+## Technology Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** - UI framework
+- **TypeScript** - Type safety
+- **Vite 7** - Build tool and dev server
+- **Tailwind CSS 4** - Styling
+- **React Query** - Server state management
+- **React Router** - Client-side routing
+- **Axios** - HTTP client
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 20+
+- npm or yarn
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Setup
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Create a `.env` file in the frontend directory:
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_URL=http://localhost:8001
+VITE_WS_URL=ws://localhost:8001
 ```
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+├── pages/           # Route-based page components
+├── services/        # API client and services
+├── utils/           # Utility functions
+├── hooks/           # Custom React hooks
+├── types/           # TypeScript type definitions
+└── styles/          # Global styles and themes
+```
+
+## Key Features
+
+### Population Management
+- Create, view, update, and delete populations
+- Real-time generation progress tracking
+- Batch operations support
+
+### Templates
+- Pre-configured population templates
+- Template customization
+- Quick start for common scenarios
+
+### Data Export
+- FHIR bundle export
+- CSV export
+- C-CDA export
+
+## API Integration
+
+The frontend communicates with the FastAPI backend through:
+- RESTful API endpoints for CRUD operations
+- WebSocket connections for real-time updates
+- File download endpoints for exports
+
+## Testing
+
+```bash
+# Unit tests
+npm run test:unit
+
+# Integration tests
+npm run test:integration
+
+# E2E tests
+npm run test:e2e
+```
+
+## Building for Production
+
+```bash
+# Build optimized production bundle
+npm run build
+
+# Preview production build
+npm run preview
+
+# Build and analyze bundle size
+npm run build:analyze
+```
+
+## Docker
+
+```bash
+# Build Docker image
+docker build -t synthea-studio-frontend .
+
+# Run container
+docker run -p 3000:80 synthea-studio-frontend
+```
+
+## Contributing
+
+See the main [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+
+## License
+
+Apache License 2.0

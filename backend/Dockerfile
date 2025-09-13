@@ -2,13 +2,13 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies including Java for Synthea
+# Install system dependencies including Java
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     curl \
     wget \
-    openjdk-17-jre-headless \
+    default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Download Synthea JAR
@@ -18,8 +18,9 @@ RUN mkdir -p /app/synthea && \
     https://github.com/synthetichealth/synthea/releases/download/${SYNTHEA_VERSION}/synthea-with-dependencies.jar && \
     chmod +x /app/synthea/synthea-with-dependencies.jar
 
-# Verify Synthea installation
-RUN java -jar /app/synthea/synthea-with-dependencies.jar --help || true
+# Verify Java and Synthea installation
+RUN java -version && \
+    java -jar /app/synthea/synthea-with-dependencies.jar --help || true
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -37,6 +38,7 @@ RUN mkdir -p /var/lib/synthea-studio/storage \
 # Set environment variables
 ENV SYNTHEA_JAR_PATH=/app/synthea/synthea-with-dependencies.jar
 ENV SYNTHEA_OUTPUT_PATH=/tmp/synthea-output
+ENV PYTHONUNBUFFERED=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
