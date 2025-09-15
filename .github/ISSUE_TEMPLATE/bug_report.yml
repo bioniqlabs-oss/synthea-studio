@@ -1,0 +1,68 @@
+name: Bug Report
+description: Report a bug in Synthea Studio
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below.
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: When I click the generate button, nothing happens...
+    validations:
+      required: true
+  
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to Population Builder
+        2. Set size to 100
+        3. Click Generate
+        4. See error
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Frontend (UI)
+        - Backend (API)
+        - Database
+        - Docker Setup
+        - Synthea Integration
+        - Documentation
+    validations:
+      required: true
+  
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version are you using?
+      placeholder: v1.0.0 or commit hash
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Any relevant log output
+      render: shell

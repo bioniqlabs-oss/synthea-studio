@@ -1,0 +1,58 @@
+# Stage 1: Download Synthea (cached separately)
+FROM alpine:latest AS synthea-downloader
+RUN apk add --no-cache wget
+WORKDIR /synthea
+ARG SYNTHEA_VERSION=master-branch-latest
+RUN wget -O synthea-with-dependencies.jar \
+    https://github.com/synthetichealth/synthea/releases/download/${SYNTHEA_VERSION}/synthea-with-dependencies.jar
+
+# Stage 2: Python builder
+FROM python:3.9-slim AS python-builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 3: Final image
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Synthea from builder
+COPY --from=synthea-downloader /synthea/synthea-with-dependencies.jar /app/synthea/synthea-with-dependencies.jar
+
+# Copy Python packages from builder
+COPY --from=python-builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
+COPY app/ app/
+COPY alembic.ini .
+COPY alembic/ alembic/
+
+# Create necessary directories
+RUN mkdir -p /var/lib/synthea-studio/storage \
+    && mkdir -p /tmp/synthea-output
+
+# Set environment variables
+ENV SYNTHEA_JAR_PATH=/app/synthea/synthea-with-dependencies.jar
+ENV SYNTHEA_OUTPUT_PATH=/tmp/synthea-output
+ENV PYTHONUNBUFFERED=1
+
+# Verify installations
+RUN python -c "import fastapi" && \
+    java -version && \
+    test -f $SYNTHEA_JAR_PATH
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

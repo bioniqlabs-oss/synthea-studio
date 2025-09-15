@@ -1,24 +1,36 @@
 # Synthea Studio
 
-Open-source configuration UI for [Synthea](https://github.com/synthetichealth/synthea) synthetic patient population generation.
+Open-source configuration UI for [Synthea™](https://github.com/synthetichealth/synthea) synthetic patient population generation.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/synthea-studio/synthea-studio/workflows/CI/badge.svg)](https://github.com/synthea-studio/synthea-studio/actions)
+[![Synthea](https://img.shields.io/badge/Powered%20by-Synthea-blue)](https://synthetichealth.github.io/synthea/)
 
 ## Overview
 
-Synthea Studio provides a modern web interface for configuring and generating synthetic patient populations using Synthea. It adds population management, job tracking, and batch operations on top of Synthea's powerful generation capabilities.
+Synthea Studio provides a modern web interface for configuring and generating synthetic patient populations using [Synthea™ Patient Generator](https://github.com/synthetichealth/synthea). It adds population management, job tracking, and batch operations on top of Synthea's powerful generation capabilities.
+
+### About Synthea™
+
+[Synthea™](https://synthetichealth.github.io/synthea/) is a synthetic patient generator developed by [The MITRE Corporation](https://www.mitre.org/) that models the medical history of synthetic patients. It provides high-quality, synthetic, realistic but not real, patient data and associated health records covering every aspect of healthcare. The resulting data is free from cost, privacy, and security restrictions, enabling research with Health IT data that is otherwise legally or practically unavailable.
+
+**Learn more about Synthea:**
+- [Official Documentation](https://synthetichealth.github.io/synthea/)
+- [GitHub Repository](https://github.com/synthetichealth/synthea)
+- [Wiki & Tutorials](https://github.com/synthetichealth/synthea/wiki)
+- [Research Publications](https://synthetichealth.github.io/synthea/publications)
+- [Community Forum](https://groups.google.com/g/synthea)
 
 ## Features
 
-- 🏥 **Visual Population Builder** - Configure demographics, conditions, and modules through an intuitive UI
-- 👥 **Population Management** - Track, organize, and manage multiple synthetic populations
-- 📊 **Real-time Progress** - Monitor generation progress with WebSocket updates
-- 🗂️ **Batch Operations** - Generate, delete, or export populations in bulk
-- 📋 **Pre-built Templates** - Start quickly with templates for common research scenarios
-- 🔄 **Job Tracking** - Full audit trail of generation jobs with configurations and logs
-- 💾 **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
-- 🚀 **Async Processing** - Non-blocking generation using Celery workers
+- **Visual Population Builder** - Configure demographics, conditions, and modules through an intuitive UI
+- **Population Management** - Track, organize, and manage multiple synthetic populations
+- **Real-time Progress** - Monitor generation progress with WebSocket updates
+- **Batch Operations** - Generate, delete, or export populations in bulk
+- **Pre-built Templates** - Start quickly with templates for common research scenarios
+- **Job Tracking** - Full audit trail of generation jobs with configurations and logs
+- **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
+- **Async Processing** - Non-blocking generation using Celery workers
 
 ## Quick Start
 
@@ -29,8 +41,11 @@ Synthea Studio provides a modern web interface for configuring and generating sy
 git clone https://github.com/synthea-studio/synthea-studio.git
 cd synthea-studio
 
-# Start all services
-docker-compose up
+# Production mode (default)
+docker-compose up -d
+
+# Development mode (with hot-reload)
+docker-compose -f docker-compose.dev.yml up -d
 
 # Visit http://localhost:3001
 ```
@@ -203,12 +218,27 @@ docker-compose -f docker-compose.test.yml up
 ### Building for Production
 
 ```bash
-# Build Docker images
-docker-compose -f docker-compose.prod.yml build
+# Build and run production containers
+docker-compose build
+docker-compose up -d
 
 # Or build individually
 docker build -t synthea-studio/frontend:latest ./frontend
 docker build -t synthea-studio/backend:latest ./backend
+```
+
+### Development Mode
+
+```bash
+# Run with hot-reload enabled for both frontend and backend
+docker-compose -f docker-compose.dev.yml up -d
+
+# Frontend changes in src/ will auto-reload
+# Backend changes in app/ will auto-reload
+
+# View logs
+docker-compose -f docker-compose.dev.yml logs -f frontend
+docker-compose -f docker-compose.dev.yml logs -f backend
 ```
 
 ## Contributing
@@ -226,14 +256,20 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Acknowledgments
 
-- [Synthea](https://github.com/synthetichealth/synthea) - The core synthetic patient generator
-- [MITRE Corporation](https://www.mitre.org/) - Original creators of Synthea
+This project builds upon the excellent work of:
+
+- **[Synthea™ Patient Generator](https://github.com/synthetichealth/synthea)** - The core synthetic patient generation engine
+- **[The MITRE Corporation](https://www.mitre.org/)** - Original creators and maintainers of Synthea
+- **[SyntheticHealth Community](https://groups.google.com/g/synthea)** - For continuous improvements and contributions
+
+### Synthea License
+Synthea™ is a Trademark of The MITRE Corporation. Synthea is licensed under the Apache License, Version 2.0. This project (Synthea Studio) is an independent UI layer and is not affiliated with or endorsed by The MITRE Corporation.
 
 ## Support
 
-- 📖 [Documentation](https://synthea-studio.github.io/docs)
-- 💬 [Discussions](https://github.com/synthea-studio/synthea-studio/discussions)
-- 🐛 [Issue Tracker](https://github.com/synthea-studio/synthea-studio/issues)
+- [Documentation](https://synthea-studio.github.io/docs)
+- [Discussions](https://github.com/synthea-studio/synthea-studio/discussions)
+- [Issue Tracker](https://github.com/synthea-studio/synthea-studio/issues)
 
 ## Roadmap
 

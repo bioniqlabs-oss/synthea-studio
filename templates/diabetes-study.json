@@ -1,0 +1,38 @@
+{
+  "name": "Diabetes Study Population",
+  "description": "Population focused on Type 2 diabetes patients with common comorbidities",
+  "size": 100,
+  "config": {
+    "modules": ["diabetes", "hypertension", "metabolic_syndrome"],
+    "age_range": [40, 75],
+    "gender_distribution": {
+      "M": 0.52,
+      "F": 0.48
+    },
+    "export_fhir": true,
+    "export_csv": true,
+    "demographics": {
+      "ethnicity": {
+        "white": 0.6,
+        "black": 0.15,
+        "hispanic": 0.15,
+        "asian": 0.08,
+        "other": 0.02
+      },
+      "socioeconomic": {
+        "income_level": "middle",
+        "insurance_type": "mixed"
+      }
+    },
+    "clinical_parameters": {
+      "diabetes_prevalence": 0.85,
+      "hba1c_range": [6.5, 10.0],
+      "bmi_range": [25, 40],
+      "complications": {
+        "retinopathy": 0.15,
+        "nephropathy": 0.20,
+        "neuropathy": 0.25
+      }
+    }
+  }
+}
