@@ -9,17 +9,27 @@ export function formatDateTime(dateString: string | null | undefined, options?: 
   
   const defaultOptions: Intl.DateTimeFormatOptions = {
     month: 'short',
-    day: 'numeric',
+    day: 'numeric', 
     year: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
-    timeZoneName: 'short',
+    hour12: true,
     ...options
   };
   
   try {
-    // Use undefined for locale to use browser's default locale
-    return new Date(dateString).toLocaleString(undefined, defaultOptions);
+    // Backend sends timestamps without timezone, they are in UTC
+    // Always append 'Z' if there's no timezone indicator
+    const hasTimezone = dateString.endsWith('Z') || 
+                       dateString.match(/[+-]\d{2}:\d{2}$/) ||
+                       dateString.endsWith('+00:00');
+    
+    const utcDateString = hasTimezone ? dateString : dateString + 'Z';
+    
+    // Parse the date string as UTC and format in browser's timezone
+    const date = new Date(utcDateString);
+    
+    return date.toLocaleString(undefined, defaultOptions);
   } catch (error) {
     console.error('Invalid date string:', dateString);
     return 'Invalid date';
@@ -35,7 +45,15 @@ export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return '';
   
   try {
-    return new Date(dateString).toLocaleDateString(undefined, {
+    // Backend sends timestamps without timezone, they are in UTC
+    // Always append 'Z' if there's no timezone indicator
+    const hasTimezone = dateString.endsWith('Z') || 
+                       dateString.match(/[+-]\d{2}:\d{2}$/) ||
+                       dateString.endsWith('+00:00');
+    
+    const utcDateString = hasTimezone ? dateString : dateString + 'Z';
+    
+    return new Date(utcDateString).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -55,17 +73,26 @@ export function getRelativeTime(dateString: string | null | undefined): string {
   if (!dateString) return '';
   
   try {
-    const date = new Date(dateString);
+    // Backend sends timestamps without timezone, they are in UTC
+    // Always append 'Z' if there's no timezone indicator
+    const hasTimezone = dateString.endsWith('Z') || 
+                       dateString.match(/[+-]\d{2}:\d{2}$/) ||
+                       dateString.endsWith('+00:00');
+    
+    const utcDateString = hasTimezone ? dateString : dateString + 'Z';
+    
+    const date = new Date(utcDateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const absDiffMs = Math.abs(diffMs);
+    const diffMins = Math.floor(absDiffMs / 60000);
+    const diffHours = Math.floor(absDiffMs / 3600000);
+    const diffDays = Math.floor(absDiffMs / 86400000);
     
-    if (Math.abs(diffMins) < 1) return 'just now';
-    if (Math.abs(diffMins) < 60) return `${Math.abs(diffMins)} minute${Math.abs(diffMins) !== 1 ? 's' : ''} ${diffMs < 0 ? 'from now' : 'ago'}`;
-    if (Math.abs(diffHours) < 24) return `${Math.abs(diffHours)} hour${Math.abs(diffHours) !== 1 ? 's' : ''} ${diffMs < 0 ? 'from now' : 'ago'}`;
-    if (Math.abs(diffDays) < 30) return `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ${diffMs < 0 ? 'from now' : 'ago'}`;
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ${diffMs > 0 ? 'ago' : 'from now'}`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ${diffMs > 0 ? 'ago' : 'from now'}`;
+    if (diffDays < 30) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ${diffMs > 0 ? 'ago' : 'from now'}`;
     
     return formatDate(dateString);
   } catch (error) {

@@ -6,7 +6,7 @@ services:
     container_name: synthea-studio-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: synthea_studio
     ports:
       - "5436:5432"
@@ -17,7 +17,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -29,7 +28,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
   backend:
     build:
@@ -37,17 +35,19 @@ services:
       dockerfile: Dockerfile
     container_name: synthea-studio-backend
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-changeme}@postgres:5432/synthea_studio
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/synthea_studio
       REDIS_URL: redis://redis:6379
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_BACKEND: local
       STORAGE_PATH: /var/lib/synthea-studio/storage
       SYNTHEA_JAR_PATH: /app/synthea/synthea-with-dependencies.jar
       SYNTHEA_OUTPUT_PATH: /tmp/synthea-output
     ports:
       - "8001:8001"
     volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
       - storage_data:/var/lib/synthea-studio/storage
       - synthea_output:/tmp/synthea-output
     depends_on:
@@ -55,22 +55,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
-    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: synthea-studio-frontend
     environment:
-      REACT_APP_API_URL: ${API_URL:-http://localhost:8001}
-      REACT_APP_WS_URL: ${WS_URL:-ws://localhost:8001}
+      REACT_APP_API_URL: http://localhost:8001
+      REACT_APP_WS_URL: ws://localhost:8001
+      # Disable host check for Docker development
+      DANGEROUSLY_DISABLE_HOST_CHECK: "true"
+      # Enable hot reload across Docker boundary
+      WATCHPACK_POLLING: "true"
+      WDS_SOCKET_PORT: 3001
     ports:
-      - "3001:80"
+      - "3001:5173"
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+      # Use anonymous volume for node_modules to avoid conflicts
+      - /app/node_modules
     depends_on:
       - backend
-    restart: unless-stopped
 
   celery:
     build:
@@ -78,7 +94,7 @@ services:
       dockerfile: Dockerfile
     container_name: synthea-studio-celery
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-changeme}@postgres:5432/synthea_studio
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/synthea_studio
       REDIS_URL: redis://redis:6379
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
@@ -86,6 +102,8 @@ services:
       SYNTHEA_JAR_PATH: /app/synthea/synthea-with-dependencies.jar
       SYNTHEA_OUTPUT_PATH: /tmp/synthea-output
     volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
       - storage_data:/var/lib/synthea-studio/storage
       - synthea_output:/tmp/synthea-output
     depends_on:
@@ -99,15 +117,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
 
   # Optional: MinIO for S3-compatible storage
   minio:
     image: minio/minio:latest
     container_name: synthea-studio-minio
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -116,7 +133,6 @@ services:
     command: server /data --console-address ":9001"
     profiles:
       - storage
-    restart: unless-stopped
 
 volumes:
   postgres_data:

@@ -15,7 +15,7 @@ export default function Layout({ children }: LayoutProps) {
   ];
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -70,9 +70,60 @@ export default function Layout({ children }: LayoutProps) {
       </header>
       
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         {children}
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+            <div className="text-center sm:text-left">
+              <p className="text-sm text-gray-600">
+                Powered by{' '}
+                <a
+                  href="https://github.com/synthetichealth/synthea"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 hover:text-blue-500"
+                >
+                  Synthea™ Patient Generator
+                </a>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                © The MITRE Corporation. Apache License 2.0
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-6 text-sm">
+              <a
+                href="https://synthetichealth.github.io/synthea/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Synthea Docs
+              </a>
+              <a
+                href="https://github.com/synthetichealth/synthea/wiki"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Wiki
+              </a>
+              <a
+                href="https://groups.google.com/g/synthea"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Community
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

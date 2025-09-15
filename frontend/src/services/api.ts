@@ -44,7 +44,7 @@ export interface Population {
   name: string;
   description?: string;
   patient_count: number;
-  status: 'pending' | 'generating' | 'completed' | 'failed';
+  status: 'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED';
   config: PopulationConfig;
   created_at: string;
   completed_at?: string;
@@ -86,7 +86,7 @@ export const populationApi = {
     limit?: number; 
     status?: string 
   }): Promise<Population[]> => {
-    const response = await apiClient.get('/api/populations', { params });
+    const response = await apiClient.get('/api/populations/', { params });
     return response.data;
   },
 
@@ -124,14 +124,18 @@ export const populationApi = {
   },
 
   // Export population
-  export: async (id: string, format: 'fhir' | 'csv' | 'ndjson' = 'fhir'): Promise<{
+  export: async (id: string, format: 'fhir' | 'csv' | 'ndjson' | 'ccda' = 'fhir'): Promise<{
     message: string;
     download_url: string;
   }> => {
-    const response = await apiClient.get(`/api/export/${id}`, {
-      params: { format }
-    });
-    return response.data;
+    // The export endpoint returns a file directly, not JSON
+    // So we'll open it directly in a new window
+    const url = `${API_BASE_URL}/api/export/${id}?format=${format}`;
+    window.open(url, '_blank');
+    return {
+      message: 'Download started',
+      download_url: url
+    };
   },
 };
 

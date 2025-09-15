@@ -100,12 +100,20 @@ async def create_population(
     # Generate population ID
     timestamp = datetime.utcnow().strftime("%Y%m%d")
     
-    # Get count for today
+    # Get highest ID for today
     result = await db.execute(
-        select(Population).where(Population.id.like(f"pop_{timestamp}_%"))
+        select(Population.id).where(
+            Population.id.like(f"pop_{timestamp}_%")
+        ).order_by(Population.id.desc())
     )
-    existing = result.scalars().all()
-    count = len(existing) + 1
+    last_id = result.scalar()
+    
+    if last_id:
+        # Extract the counter from the last ID
+        last_count = int(last_id.split('_')[-1])
+        count = last_count + 1
+    else:
+        count = 1
     
     population_id = f"pop_{timestamp}_{count:03d}"
     
@@ -151,8 +159,15 @@ async def delete_population(
     if not population:
         raise HTTPException(status_code=404, detail="Population not found")
     
+    # Delete related generation jobs first
+    from app.models import GenerationJob
+    await db.execute(
+        delete(GenerationJob).where(GenerationJob.population_id == population_id)
+    )
+    
     # TODO: Delete storage artifacts
     
+    # Now delete the population
     await db.execute(
         delete(Population).where(Population.id == population_id)
     )

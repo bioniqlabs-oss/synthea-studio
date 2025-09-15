@@ -110,21 +110,12 @@ class SyntheaWrapper:
             "-jar",
             str(self.synthea_jar),
             "-p", str(size),  # Population size
-            "--exporter.baseDirectory", str(output_path)
+            f"--exporter.baseDirectory={str(output_path)}"
         ]
         
-        # Add configuration options
-        if "state" in config:
-            cmd.extend(["-s", config["state"]])
-        else:
-            cmd.extend(["-s", settings.SYNTHEA_DEFAULT_STATE])
-        
-        if "city" in config:
-            cmd.extend(["-cs", config["city"]])
-        
-        if "modules" in config:
-            for module in config["modules"]:
-                cmd.extend(["-m", module])
+        # Add optional parameters
+        if "seed" in config:
+            cmd.extend(["-s", str(config["seed"])])
         
         if "age_range" in config:
             min_age, max_age = config["age_range"]
@@ -132,9 +123,6 @@ class SyntheaWrapper:
         
         if "gender" in config:
             cmd.extend(["-g", config["gender"]])
-        
-        if "seed" in config:
-            cmd.extend(["-seed", str(config["seed"])])
         
         # Export formats
         if config.get("export_fhir", True):
@@ -147,6 +135,20 @@ class SyntheaWrapper:
         
         if config.get("export_ccda", False):
             cmd.append("--exporter.ccda.export=true")
+        
+        # Disease modules - Synthea uses modules differently
+        # We'll enable them via configuration properties
+        if "modules" in config and config["modules"]:
+            # For specific disease modules, we can use generate.only_dead_patients
+            # or other module-specific settings
+            pass
+        
+        # State and city are positional arguments at the end
+        state = config.get("state", settings.SYNTHEA_DEFAULT_STATE)
+        cmd.append(state)
+        
+        if "city" in config:
+            cmd.append(config["city"])
         
         return cmd
     

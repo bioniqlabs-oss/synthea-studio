@@ -15,13 +15,13 @@ export default function PopulationDetail() {
     enabled: !!id,
     refetchInterval: (query) => {
       // Poll every 5 seconds if generating
-      return query.state.data?.status === 'generating' ? 5000 : false;
+      return query.state.data?.status === 'GENERATING' ? 5000 : false;
     }
   });
 
   // WebSocket connection for real-time progress
   useEffect(() => {
-    if (population?.status === 'generating' && id) {
+    if (population?.status === 'GENERATING' && id) {
       const websocket = new ProgressWebSocket();
       websocket.connect(id, {
         onProgress: (data) => {
@@ -67,10 +67,10 @@ export default function PopulationDetail() {
   }
 
   const statusColors = {
-    pending: 'bg-gray-100 text-gray-800',
-    generating: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
+    PENDING: 'bg-gray-100 text-gray-800',
+    GENERATING: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-green-100 text-green-800',
+    FAILED: 'bg-red-100 text-red-800',
   };
 
   return (
@@ -91,7 +91,7 @@ export default function PopulationDetail() {
       </div>
 
       {/* Progress Bar (if generating) */}
-      {population.status === 'generating' && (
+      {population.status === 'GENERATING' && (
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Generation Progress</h3>
           <div className="space-y-4">
@@ -222,7 +222,7 @@ export default function PopulationDetail() {
           Back to Dashboard
         </button>
         
-        {population.status === 'pending' && (
+        {population.status === 'PENDING' && (
           <button
             onClick={() => populationApi.startGeneration(id!).then(() => refetch())}
             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
@@ -231,20 +231,49 @@ export default function PopulationDetail() {
           </button>
         )}
         
-        {population.status === 'completed' && (
+        {population.status === 'COMPLETED' && (
           <>
             <button
-              onClick={() => populationApi.export(id!, 'fhir')}
+              onClick={async () => {
+                try {
+                  await populationApi.export(id!, 'fhir');
+                  // The export opens in a new window/downloads directly
+                } catch (error) {
+                  alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                }
+              }}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
             >
               Export FHIR
             </button>
             {population.config.export_csv && (
               <button
-                onClick={() => populationApi.export(id!, 'csv')}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                onClick={async () => {
+                  try {
+                    await populationApi.export(id!, 'csv');
+                    // The export opens in a new window/downloads directly
+                  } catch (error) {
+                    alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                  }
+                }}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
               >
                 Export CSV
+              </button>
+            )}
+            {population.config.export_ccda && (
+              <button
+                onClick={async () => {
+                  try {
+                    await populationApi.export(id!, 'ccda');
+                    // The export opens in a new window/downloads directly
+                  } catch (error) {
+                    alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                  }
+                }}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              >
+                Export C-CDA
               </button>
             )}
           </>
@@ -253,11 +282,16 @@ export default function PopulationDetail() {
         <button
           onClick={async () => {
             if (confirm('Delete this population? This cannot be undone.')) {
-              await populationApi.delete(id!);
-              navigate('/');
+              try {
+                await populationApi.delete(id!);
+                navigate('/');
+              } catch (error) {
+                console.error('Failed to delete population:', error);
+                alert(`Failed to delete population: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
             }
           }}
-          disabled={population.status === 'generating'}
+          disabled={population.status === 'GENERATING'}
           className="px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Delete Population

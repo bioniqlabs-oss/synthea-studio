@@ -10,10 +10,10 @@ from app.core.database import Base
 
 
 class PopulationStatus(str, enum.Enum):
-    PENDING = "pending"
-    GENERATING = "generating"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    GENERATING = "GENERATING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class Population(Base):

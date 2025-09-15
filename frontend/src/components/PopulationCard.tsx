@@ -13,17 +13,17 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
   const [isDeleting, setIsDeleting] = useState(false);
   
   const statusColors = {
-    pending: 'bg-gray-100 text-gray-800',
-    generating: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
+    PENDING: 'bg-gray-100 text-gray-800',
+    GENERATING: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-green-100 text-green-800',
+    FAILED: 'bg-red-100 text-red-800',
   };
   
   const statusLabels = {
-    pending: 'Pending',
-    generating: 'Generating',
-    completed: 'Completed',
-    failed: 'Failed',
+    PENDING: 'Pending',
+    GENERATING: 'Generating',
+    COMPLETED: 'Completed',
+    FAILED: 'Failed',
   };
   
   const handleDelete = async () => {
@@ -89,16 +89,55 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
           View Details
         </Link>
         
-        {population.status === 'completed' && (
-          <button
-            onClick={() => populationApi.export(population.id, 'fhir')}
-            className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Export
-          </button>
+        {population.status === 'COMPLETED' && (
+          <>
+            <button
+              onClick={async () => {
+                try {
+                  await populationApi.export(population.id, 'fhir');
+                  // The export opens in a new window/downloads directly
+                } catch (error) {
+                  alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                }
+              }}
+              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
+            >
+              FHIR
+            </button>
+            {population.config.export_csv && (
+              <button
+                onClick={async () => {
+                  try {
+                    await populationApi.export(population.id, 'csv');
+                    // The export opens in a new window/downloads directly
+                  } catch (error) {
+                    alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                  }
+                }}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
+              >
+                CSV
+              </button>
+            )}
+            {population.config.export_ccda && (
+              <button
+                onClick={async () => {
+                  try {
+                    await populationApi.export(population.id, 'ccda');
+                    // The export opens in a new window/downloads directly
+                  } catch (error) {
+                    alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                  }
+                }}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
+              >
+                C-CDA
+              </button>
+            )}
+          </>
         )}
         
-        {population.status === 'pending' && (
+        {population.status === 'PENDING' && (
           <button
             onClick={() => populationApi.startGeneration(population.id)}
             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700"
@@ -107,7 +146,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
           </button>
         )}
         
-        {population.status === 'generating' && (
+        {population.status === 'GENERATING' && (
           <button
             onClick={() => populationApi.stopGeneration(population.id)}
             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700"
@@ -118,7 +157,7 @@ export default function PopulationCard({ population, onDelete }: PopulationCardP
         
         <button
           onClick={handleDelete}
-          disabled={isDeleting || population.status === 'generating'}
+          disabled={isDeleting || population.status === 'GENERATING'}
           className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isDeleting ? 'Deleting...' : 'Delete'}
