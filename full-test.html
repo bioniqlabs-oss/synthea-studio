@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Full Module Federation Test</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</head>
+<body>
+    <h1>Full Module Federation Test - Simulating Shell Behavior</h1>
+    <button onclick="runTest()">Run Complete Test</button>
+    <div id="status"></div>
+    <div id="component-root" style="border: 2px solid blue; padding: 20px; margin: 20px 0; min-height: 100px;">
+        <p>Component will render here...</p>
+    </div>
+
+    <script>
+        const status = document.getElementById('status');
+        const componentRoot = document.getElementById('component-root');
+
+        function log(message, isError = false) {
+            const p = document.createElement('p');
+            p.style.color = isError ? 'red' : 'green';
+            p.textContent = new Date().toISOString().substr(11, 8) + ' - ' + message;
+            status.appendChild(p);
+            console.log(message);
+        }
+
+        async function runTest() {
+            status.innerHTML = '';
+            componentRoot.innerHTML = '<p>Loading component...</p>';
+
+            try {
+                // Step 1: Load remoteEntry.js
+                log('Step 1: Loading remoteEntry.js from http://localhost:3002/remoteEntry.js');
+
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'http://localhost:3002/remoteEntry.js';
+                    script.onload = () => {
+                        log('✅ remoteEntry.js loaded successfully');
+                        resolve();
+                    };
+                    script.onerror = (e) => {
+                        log('❌ Failed to load remoteEntry.js', true);
+                        reject(e);
+                    };
+                    document.head.appendChild(script);
+                });
+
+                // Step 2: Check container
+                if (typeof syntheaCore === 'undefined') {
+                    throw new Error('syntheaCore container not found after loading script');
+                }
+                log('✅ syntheaCore container is available');
+
+                // Step 3: Initialize container
+                log('Step 3: Initializing container...');
+                await syntheaCore.init({
+                    react: {
+                        get: () => Promise.resolve(() => React)
+                    },
+                    'react-dom': {
+                        get: () => Promise.resolve(() => ReactDOM)
+                    }
+                });
+                log('✅ Container initialized');
+
+                // Step 4: Get TestComponent
+                log('Step 4: Getting TestComponent from container...');
+                const moduleFactory = await syntheaCore.get('./TestComponent');
+                log('✅ Got module factory');
+
+                // Step 5: Execute factory
+                log('Step 5: Executing module factory...');
+                const module = moduleFactory();
+                log('✅ Module created');
+
+                // Step 6: Get the component
+                const TestComponent = module.default || module;
+                if (typeof TestComponent !== 'function') {
+                    throw new Error(`TestComponent is not a function, got: ${typeof TestComponent}`);
+                }
+                log('✅ TestComponent is a valid React component');
+
+                // Step 7: Render the component
+                log('Step 7: Rendering TestComponent...');
+                const element = React.createElement(TestComponent);
+                ReactDOM.render(element, componentRoot);
+                log('🎉 SUCCESS! TestComponent rendered! Module Federation is working!');
+
+            } catch (error) {
+                log(`❌ FAILED: ${error.message}`, true);
+                console.error('Full error:', error);
+                componentRoot.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

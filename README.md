@@ -31,6 +31,8 @@ Synthea Studio provides a modern web interface for configuring and generating sy
 - **Job Tracking** - Full audit trail of generation jobs with configurations and logs
 - **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
 - **Async Processing** - Non-blocking generation using Celery workers
+- **Micro-Frontend Architecture** - Embed Synthea Studio in your applications via Module Federation
+- **Standalone & Embeddable** - Run as independent app or integrate into existing platforms
 
 ## Quick Start
 
@@ -58,10 +60,15 @@ cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --port 8001
 
-# Frontend
-cd frontend
+# Core Module (Micro-frontend)
+cd packages/core
 npm install
-npm start
+npm run dev  # Runs on port 3002
+
+# Shell Application (Standalone)
+cd packages/shell
+npm install
+npm run dev  # Runs on port 3001
 
 # Database
 docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:14
@@ -72,9 +79,29 @@ docker run -d -p 6379:6379 redis:7
 
 ## Architecture
 
+### Micro-Frontend Architecture
+```
+┌─────────────────────────────────────────┐
+│         Shell Application (3001)        │
+│                                         │
+│  ┌───────────────────────────────────┐ │
+│  │    Core Module (3002)             │ │
+│  │  ┌──────────┐  ┌──────────┐      │ │
+│  │  │Population│  │ Patient  │      │ │
+│  │  │ Manager  │  │Generator │      │ │
+│  │  └──────────┘  └──────────┘      │ │
+│  └───────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+           │                │
+           ▼                ▼
+    Can be embedded   Or run standalone
+    in other apps
+```
+
+### System Architecture
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   React UI   │────▶│  FastAPI     │────▶│   Synthea    │
+│ Micro-Frontend────▶│  FastAPI     │────▶│   Synthea    │
 │  (Port 3001) │     │  (Port 8001) │     │   (Java)     │
 └──────────────┘     └──────────────┘     └──────────────┘
                             │
@@ -158,6 +185,60 @@ curl http://localhost:8001/api/populations
 ```bash
 curl -X DELETE http://localhost:8001/api/populations/pop_20240112_001
 ```
+
+## Embedding Synthea Studio
+
+Synthea Studio can be embedded into your application using Module Federation:
+
+### JavaScript/React Integration
+
+```javascript
+// Dynamic import at runtime
+const SyntheaStudio = lazy(() => {
+  return import('syntheaCore/SyntheaStudio');
+});
+
+// Use as a component
+function YourApp() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SyntheaStudio
+        mode="compact"
+        apiUrl="http://localhost:8001"
+        onPopulationCreated={(population) => {
+          console.log('Population created:', population);
+        }}
+      />
+    </Suspense>
+  );
+}
+```
+
+### Configuration Options
+
+```javascript
+<SyntheaStudio
+  // Display mode
+  mode="full" | "compact" | "widget"
+
+  // API configuration
+  apiUrl="http://your-api-server:8001"
+
+  // Feature flags
+  features={{
+    showHeader: false,
+    allowDelete: true,
+    allowExport: true
+  }}
+
+  // Callbacks
+  onPopulationCreated={(population) => {}}
+  onPatientsGenerated={(patients) => {}}
+  onError={(error) => {}}
+/>
+```
+
+See [INTEGRATION.md](INTEGRATION.md) for detailed integration instructions.
 
 ## Integration with External Systems
 

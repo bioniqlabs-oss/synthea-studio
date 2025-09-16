@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  # Synthea Core Module (Production)
+  synthea-core:
+    build:
+      context: ./packages/core
+      dockerfile: Dockerfile
+    container_name: synthea-studio-core-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      REACT_APP_API_URL: ${API_URL:-http://localhost:8001}
+      PUBLIC_PATH: ${CORE_PUBLIC_PATH:-http://localhost:3002/}
+    ports:
+      - "3002:3002"
+    restart: unless-stopped

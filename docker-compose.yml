@@ -58,18 +58,42 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001
     restart: unless-stopped
 
-  frontend:
+  # Synthea Core Module (Micro-frontend)
+  synthea-core:
     build:
-      context: ./frontend
+      context: ./packages/core
       dockerfile: Dockerfile
-    container_name: synthea-studio-frontend
+    container_name: synthea-studio-core
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
       REACT_APP_API_URL: ${API_URL:-http://localhost:8001}
-      REACT_APP_WS_URL: ${WS_URL:-ws://localhost:8001}
+      PUBLIC_PATH: ${CORE_PUBLIC_PATH:-http://localhost:3002/}
     ports:
-      - "3001:80"
+      - "3002:3002"
+    volumes:
+      - ./packages/core:/app:delegated
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Synthea Shell (Standalone App)
+  synthea-shell:
+    build:
+      context: ./packages/shell
+      dockerfile: Dockerfile
+    container_name: synthea-studio-shell
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      SYNTHEA_CORE_URL: ${SYNTHEA_CORE_URL:-http://localhost:3002/remoteEntry.js}
+    ports:
+      - "3001:3001"
     depends_on:
+      - synthea-core
       - backend
+    volumes:
+      - ./packages/shell:/app:delegated
+      - /app/node_modules
     restart: unless-stopped
 
   celery:
