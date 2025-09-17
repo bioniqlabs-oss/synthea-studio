@@ -31,7 +31,6 @@ Synthea Studio provides a modern web interface for configuring and generating sy
 - **Job Tracking** - Full audit trail of generation jobs with configurations and logs
 - **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
 - **Async Processing** - Non-blocking generation using Celery workers
-- **Micro-Frontend Architecture** - Embed Synthea Studio in your applications via Module Federation
 - **Standalone & Embeddable** - Run as independent app or integrate into existing platforms
 
 ## Quick Start
@@ -43,13 +42,10 @@ Synthea Studio provides a modern web interface for configuring and generating sy
 git clone https://github.com/synthea-studio/synthea-studio.git
 cd synthea-studio
 
-# Production mode (default)
-docker-compose up -d
+# Standalone mode (full stack)
+docker-compose -f docker-compose.standalone.yml up -d
 
-# Development mode (with hot-reload)
-docker-compose -f docker-compose.dev.yml up -d
-
-# Visit http://localhost:3001
+# Visit http://localhost:3003
 ```
 
 ### Manual Setup
@@ -60,15 +56,10 @@ cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --port 8001
 
-# Core Module (Micro-frontend)
+# Frontend
 cd packages/core
 npm install
-npm run dev  # Runs on port 3002
-
-# Shell Application (Standalone)
-cd packages/shell
-npm install
-npm run dev  # Runs on port 3001
+npm run dev  # Runs on port 3003
 
 # Database
 docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:14
@@ -79,30 +70,27 @@ docker run -d -p 6379:6379 redis:7
 
 ## Architecture
 
-### Micro-Frontend Architecture
-```
-┌─────────────────────────────────────────┐
-│         Shell Application (3001)        │
-│                                         │
-│  ┌───────────────────────────────────┐ │
-│  │    Core Module (3002)             │ │
-│  │  ┌──────────┐  ┌──────────┐      │ │
-│  │  │Population│  │ Patient  │      │ │
-│  │  │ Manager  │  │Generator │      │ │
-│  │  └──────────┘  └──────────┘      │ │
-│  └───────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-           │                │
-           ▼                ▼
-    Can be embedded   Or run standalone
-    in other apps
-```
+### Deployment Modes
+
+Synthea Studio supports two deployment modes:
+
+1. **Standalone Mode**: Full stack deployment with Docker
+   - Frontend served from Docker container (port 3003)
+   - Backend API running in Docker (port 8001)
+   - PostgreSQL and Redis in Docker
+   - Use `docker-compose.standalone.yml`
+
+2. **Embedded Mode**: Backend in Docker, frontend as NPM package
+   - Backend-only Docker deployment
+   - Frontend distributed as NPM package `@synthea-studio/core`
+   - Can be integrated into existing React applications
+   - Use `docker-compose.backend.yml` for backend
 
 ### System Architecture
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│ Micro-Frontend────▶│  FastAPI     │────▶│   Synthea    │
-│  (Port 3001) │     │  (Port 8001) │     │   (Java)     │
+│   Frontend   │────▶│  FastAPI     │────▶│   Synthea    │
+│  (Port 3003) │     │  (Port 8001) │     │   (Java)     │
 └──────────────┘     └──────────────┘     └──────────────┘
                             │
                      ┌──────┴──────┐
@@ -188,30 +176,38 @@ curl -X DELETE http://localhost:8001/api/populations/pop_20240112_001
 
 ## Embedding Synthea Studio
 
-Synthea Studio can be embedded into your application using Module Federation:
+Synthea Studio can be embedded into your application as an NPM package:
+
+### Installation
+
+```bash
+npm install @synthea-studio/core
+```
 
 ### JavaScript/React Integration
 
 ```javascript
-// Dynamic import at runtime
-const SyntheaStudio = lazy(() => {
-  return import('syntheaCore/SyntheaStudio');
-});
+import { SyntheaStudio } from '@synthea-studio/core';
 
 // Use as a component
 function YourApp() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SyntheaStudio
-        mode="compact"
-        apiUrl="http://localhost:8001"
-        onPopulationCreated={(population) => {
-          console.log('Population created:', population);
-        }}
-      />
-    </Suspense>
+    <SyntheaStudio
+      mode="compact"
+      apiUrl="http://localhost:8001"
+      onPopulationCreated={(population) => {
+        console.log('Population created:', population);
+      }}
+    />
   );
 }
+```
+
+### Backend Deployment for Embedded Mode
+
+```bash
+# Deploy backend services only
+docker-compose -f docker-compose.backend.yml up -d
 ```
 
 ### Configuration Options
@@ -273,11 +269,11 @@ curl -X POST http://localhost:8080/api/import \
 
 ```
 synthea-studio/
-├── frontend/          # React UI
+├── packages/
+│   └── core/          # React frontend application
 ├── backend/           # FastAPI backend
-├── database/          # PostgreSQL migrations
-├── synthea/           # Synthea JAR and configs
-├── templates/         # Pre-built population templates
+├── docker-compose.standalone.yml  # Full stack deployment
+├── docker-compose.backend.yml     # Backend-only for embedded mode
 └── docs/             # Documentation
 ```
 
@@ -289,7 +285,7 @@ cd backend
 pytest
 
 # Frontend tests
-cd frontend
+cd packages/core
 npm test
 
 # End-to-end tests
@@ -298,28 +294,41 @@ docker-compose -f docker-compose.test.yml up
 
 ### Building for Production
 
-```bash
-# Build and run production containers
-docker-compose build
-docker-compose up -d
+#### Standalone Mode (Docker)
 
-# Or build individually
-docker build -t synthea-studio/frontend:latest ./frontend
-docker build -t synthea-studio/backend:latest ./backend
+```bash
+# Build and run all services
+docker-compose -f docker-compose.standalone.yml build
+docker-compose -f docker-compose.standalone.yml up -d
+```
+
+#### Embedded Mode (NPM Package)
+
+```bash
+# Build the NPM package
+cd packages/core
+npm run build:lib
+
+# Publish to NPM (if authorized)
+npm publish
+
+# Or use locally via npm link
+npm link
 ```
 
 ### Development Mode
 
 ```bash
-# Run with hot-reload enabled for both frontend and backend
-docker-compose -f docker-compose.dev.yml up -d
+# Frontend development with Vite hot-reload
+cd packages/core
+npm run dev
 
-# Frontend changes in src/ will auto-reload
-# Backend changes in app/ will auto-reload
+# Backend development with auto-reload
+cd backend
+uvicorn app.main:app --reload --port 8001
 
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f frontend
-docker-compose -f docker-compose.dev.yml logs -f backend
+# Or use Docker for full stack development
+docker-compose -f docker-compose.standalone.yml up
 ```
 
 ## Contributing

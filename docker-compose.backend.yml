@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: synthea-studio-db
+    environment:
+      POSTGRES_DB: synthea_studio
+      POSTGRES_USER: synthea
+      POSTGRES_PASSWORD: synthea_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synthea"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synthea-network
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: synthea-studio-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synthea-network
+
+  # Backend API (Python FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: synthea-studio-backend
+    environment:
+      DATABASE_URL: postgresql://synthea:synthea_pass@db:5432/synthea_studio
+      REDIS_URL: redis://redis:6379
+      # Allow CORS from any origin for embedded use
+      CORS_ORIGINS: "*"
+    ports:
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+      - ./synthea:/app/synthea
+    networks:
+      - synthea-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
+  # Celery Worker for Background Tasks
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: synthea-studio-celery
+    environment:
+      DATABASE_URL: postgresql://synthea:synthea_pass@db:5432/synthea_studio
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - db
+      - redis
+      - backend
+    volumes:
+      - ./storage:/app/storage
+      - ./synthea:/app/synthea
+    networks:
+      - synthea-network
+    command: celery -A app.tasks worker --loglevel=info
+
+networks:
+  synthea-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

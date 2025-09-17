@@ -19,20 +19,22 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({ onSelectPopulati
     );
   }
 
+  const populationList = Array.isArray(populations) ? populations : [];
+
   const stats = {
-    total: populations.length,
-    totalPatients: populations.reduce((sum, p) => sum + p.patient_count, 0),
-    pending: populations.filter(p => p.status.toLowerCase() === 'pending').length,
-    generating: populations.filter(p => p.status.toLowerCase() === 'generating').length,
-    completed: populations.filter(p => p.status.toLowerCase() === 'completed').length,
-    failed: populations.filter(p => p.status.toLowerCase() === 'failed').length,
+    total: populationList.length,
+    totalPatients: populationList.reduce((sum, p) => sum + (p.patient_count || 0), 0),
+    pending: populationList.filter(p => p.status?.toLowerCase() === 'pending').length,
+    generating: populationList.filter(p => p.status?.toLowerCase() === 'generating').length,
+    completed: populationList.filter(p => p.status?.toLowerCase() === 'completed').length,
+    failed: populationList.filter(p => p.status?.toLowerCase() === 'failed').length,
   };
 
   const populationsByStatus = {
-    generating: populations.filter(p => p.status.toLowerCase() === 'generating'),
-    pending: populations.filter(p => p.status.toLowerCase() === 'pending'),
-    completed: populations.filter(p => p.status.toLowerCase() === 'completed'),
-    failed: populations.filter(p => p.status.toLowerCase() === 'failed'),
+    generating: populationList.filter(p => p.status?.toLowerCase() === 'generating'),
+    pending: populationList.filter(p => p.status?.toLowerCase() === 'pending'),
+    completed: populationList.filter(p => p.status?.toLowerCase() === 'completed'),
+    failed: populationList.filter(p => p.status?.toLowerCase() === 'failed'),
   };
 
   return (

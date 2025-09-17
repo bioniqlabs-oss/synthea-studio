@@ -81,17 +81,50 @@ function App() {
   useEffect(() => {
     const loadRemoteModule = async () => {
       try {
-        // Load the SyntheaStudioWithRouter component from the remote module
-        const module = await import('syntheaCore/SyntheaStudioWithRouter');
-        const Component = module.default;
+        // Wait a bit to ensure the remote is ready
+        if (retryCount === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Load the SyntheaStudio component from the remote module
+        const module = await import('syntheaCore/SyntheaStudio');
+        console.log('Loaded module:', module);
+        console.log('Module keys:', Object.keys(module));
+
+        // The module should have a default export that is the component
+        let Component = module.default;
+
+        // If default is a getter, call it
+        if (Component && Object.getOwnPropertyDescriptor(module, 'default')?.get) {
+          console.log('Default is a getter, calling it...');
+          Component = module.default;
+        }
+
+        // If default doesn't exist or is not a function, try named export
+        if (!Component || typeof Component !== 'function') {
+          Component = module.SyntheaStudio;
+        }
+
+        console.log('Component type:', typeof Component);
+        console.log('Component:', Component);
 
         if (!Component || typeof Component !== 'function') {
-          throw new Error('Invalid SyntheaStudioWithRouter component');
+          console.error('Component validation failed:', {
+            Component,
+            type: typeof Component,
+            keys: Object.keys(module),
+            module,
+            default: module.default,
+            SyntheaStudio: module.SyntheaStudio,
+            descriptor: Object.getOwnPropertyDescriptor(module, 'default')
+          });
+          throw new Error('Invalid SyntheaStudio component - not a function');
         }
 
         setSyntheaStudio(() => Component);
         setLoadError(null);
       } catch (error) {
+        console.error('Failed to load remote module:', error);
         setLoadError(error as Error);
 
         // Retry if we haven't exceeded max retries

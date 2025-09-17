@@ -12,8 +12,5 @@ COPY . .
 # Expose port for webpack dev server
 EXPOSE 3002
 
-# Build production first, then serve it
-RUN npm run build
-
-# Start production server
-CMD ["node", "serve-production.js"]
+# Start webpack dev server
+CMD ["npm", "run", "dev"]

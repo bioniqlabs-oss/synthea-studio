@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunk_synthea_studio_core=self.webpackChunk_synthea_studio_core||[]).push([[803],{495:(e,t,s)=>{s(848);var n=s(511),r=(s(338),s(419));s(187),(0,n.createContext)(void 0),s(91),s(753),new r.QueryClient({defaultOptions:{queries:{refetchOnWindowFocus:!1,retry:2,staleTime:3e5}}})}}]);
+//# sourceMappingURL=803.0ed9ae2da323879644f2.js.map

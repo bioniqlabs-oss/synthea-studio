@@ -89,20 +89,20 @@ module.exports = (env, argv) => {
         filename: 'remoteEntry.js',
         exposes: {
           './SyntheaStudio': './src/federation-export.js',
-          './SyntheaStudioWithRouter': './src/federation-export-router.js',
         },
         shared: {
           ...deps,
           react: {
             singleton: true,
             requiredVersion: deps.react,
-            eager: false,
+            eager: true,
           },
           'react-dom': {
             singleton: true,
             requiredVersion: deps['react-dom'],
-            eager: false,
+            eager: true,
           },
+          // Kept for potential future use but not required for embedded version
           'react-router-dom': {
             singleton: true,
             requiredVersion: deps['react-router-dom'],

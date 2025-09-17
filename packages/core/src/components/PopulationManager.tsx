@@ -86,6 +86,20 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
                 {population.description && (
                   <p className="text-gray-500 truncate">{population.description}</p>
                 )}
+                {population.status.toLowerCase() === 'generating' && population.progress !== undefined && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Progress</span>
+                      <span>{population.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${population.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 flex gap-2">

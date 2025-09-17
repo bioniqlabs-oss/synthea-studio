@@ -2,15 +2,34 @@
   "name": "@synthea-studio/core",
   "version": "1.0.0",
   "description": "Synthea Studio Core - Embeddable synthetic patient data generator",
-  "main": "dist/index.js",
+  "main": "dist/synthea-studio.umd.js",
+  "module": "dist/synthea-studio.es.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/synthea-studio.git"
+  },
+  "keywords": [
+    "synthea",
+    "synthetic-data",
+    "healthcare",
+    "patient-data",
+    "react",
+    "microfrontend"
+  ],
   "scripts": {
-    "dev": "webpack serve --mode development --port 3002",
-    "build": "webpack --mode production",
-    "serve:module": "webpack serve --mode development --port 3002",
+    "dev": "vite",
+    "build": "vite build",
+    "build:lib": "vite build --config vite.lib.config.ts",
+    "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "prepublishOnly": "npm run build:lib"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.13",
@@ -34,6 +53,7 @@
     "@types/react-dom": "^18.0.10",
     "@typescript-eslint/eslint-plugin": "^5.48.2",
     "@typescript-eslint/parser": "^5.48.2",
+    "@vitejs/plugin-react": "^5.0.2",
     "autoprefixer": "^10.4.13",
     "babel-loader": "^10.0.0",
     "css-loader": "^6.7.3",
@@ -47,6 +67,7 @@
     "tailwindcss": "^3.2.4",
     "ts-loader": "^9.4.2",
     "typescript": "^4.9.4",
+    "vite": "^7.1.5",
     "webpack": "^5.75.0",
     "webpack-cli": "^5.0.1",
     "webpack-dev-server": "^4.11.1"
