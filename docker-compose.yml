@@ -1,0 +1,103 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: ./packages/app/Dockerfile.full
+    container_name: synthea-frontend
+    ports:
+      - "3080:80"
+    depends_on:
+      - backend
+    networks:
+      - synthea-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: synthea-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://synthea:synthea_pass@synthea-postgres:5432/synthea
+      - REDIS_URL=redis://synthea-redis:6379
+      - CELERY_BROKER_URL=redis://synthea-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://synthea-redis:6379/1
+      - CORS_ORIGINS=["http://localhost:3080","http://localhost:3000","http://localhost:5173"]
+      - ENABLE_FHIR=true
+      - AUTO_IMPORT_PATIENTS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synthea-network
+    restart: unless-stopped
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: synthea-celery
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://synthea:synthea_pass@synthea-postgres:5432/synthea
+      - REDIS_URL=redis://synthea-redis:6379
+      - CELERY_BROKER_URL=redis://synthea-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://synthea-redis:6379/1
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - synthea-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:14-alpine
+    container_name: synthea-postgres
+    environment:
+      - POSTGRES_DB=synthea
+      - POSTGRES_USER=synthea
+      - POSTGRES_PASSWORD=synthea_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synthea"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synthea-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: synthea-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synthea-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  synthea-network:
+    driver: bridge

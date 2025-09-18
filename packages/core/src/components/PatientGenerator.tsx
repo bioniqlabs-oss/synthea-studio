@@ -11,8 +11,8 @@ export const PatientGenerator: React.FC<PatientGeneratorProps> = ({ onSuccess })
   const { generatePopulation, isGenerating } = useGenerator();
 
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
+    name: `Population ${new Date().toISOString().split('T')[0]}`,
+    description: 'Generated synthetic patient population',
     size: 10,
     config: {
       modules: [] as string[],
@@ -29,23 +29,48 @@ export const PatientGenerator: React.FC<PatientGeneratorProps> = ({ onSuccess })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Clean up config - remove empty strings for city/state
-    const cleanConfig = {
-      ...formData.config,
-      city: formData.config.city?.trim() || undefined,
-      state: formData.config.state?.trim() || 'Massachusetts',
-    };
+    console.log('Submitting form with data:', formData);
 
-    const population = await generatePopulation({
-      name: formData.name,
-      description: formData.description,
-      size: formData.size,
-      config: cleanConfig,
-    });
+    try {
+      // Clean up config - remove empty strings for city/state
+      const cleanConfig = {
+        ...formData.config,
+        city: formData.config.city?.trim() || undefined,
+        state: formData.config.state?.trim() || 'Massachusetts',
+      };
 
-    if (population) {
-      config.callbacks.onPopulationCreated?.(population);
-      onSuccess?.();
+      const population = await generatePopulation({
+        name: formData.name,
+        description: formData.description,
+        size: formData.size,
+        config: cleanConfig,
+      });
+
+      console.log('Population created:', population);
+
+      if (population) {
+        config.callbacks.onPopulationCreated?.(population);
+        onSuccess?.();
+        // Reset form
+        setFormData({
+          name: `Population ${new Date().toISOString().split('T')[0]}`,
+          description: 'Generated synthetic patient population',
+          size: 10,
+          config: {
+            modules: [],
+            age_range: [0, 100],
+            gender_distribution: { M: 0.5, F: 0.5 },
+            state: 'Massachusetts',
+            city: '',
+            export_fhir: true,
+            export_csv: false,
+            export_ccda: false,
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to generate population:', error);
+      alert(`Failed to generate population: ${error}`);
     }
   };
 
@@ -353,8 +378,8 @@ export const PatientGenerator: React.FC<PatientGeneratorProps> = ({ onSuccess })
           </button>
           <button
             type="submit"
-            disabled={isGenerating}
-            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            disabled={isGenerating || !formData.name.trim()}
+            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isGenerating ? 'Creating...' : 'Create Population'}
           </button>

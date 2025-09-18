@@ -1,0 +1,169 @@
+.fhir-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.fhir-viewer-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fhir-viewer-header h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.fhir-viewer-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.resource-select,
+.patient-id-input {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.resource-select {
+  min-width: 150px;
+}
+
+.patient-id-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.resource-select:focus,
+.patient-id-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.load-btn {
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.load-btn:hover {
+  background: #2563eb;
+}
+
+.view-mode-toggle {
+  display: flex;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-mode-toggle button {
+  padding: 0.5rem 1rem;
+  background: white;
+  border: none;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.view-mode-toggle button:not(:last-child) {
+  border-right: 1px solid #d1d5db;
+}
+
+.view-mode-toggle button.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.view-mode-toggle button:hover:not(.active) {
+  background: #f9fafb;
+}
+
+.fhir-viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.fhir-json {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fhir-formatted {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.fhir-formatted h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.fhir-formatted dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.fhir-formatted dt {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.fhir-formatted dd {
+  margin: 0;
+  color: #1f2937;
+}
+
+.fhir-formatted ul {
+  margin: 1rem 0 0 0;
+  padding: 0 0 0 1.5rem;
+}
+
+.fhir-formatted li {
+  margin: 0.25rem 0;
+  color: #4b5563;
+}
+
+.fhir-loading,
+.fhir-empty,
+.fhir-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.fhir-error {
+  color: #ef4444;
+}

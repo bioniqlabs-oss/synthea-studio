@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePopulations } from '../hooks/usePopulations';
 import { useSyntheaConfig } from '../contexts/SyntheaContext';
-import { startGeneration } from '../services/api';
+import { startGeneration, importToFHIR } from '../services/api';
+import toast from 'react-hot-toast';
 
 interface PopulationManagerProps {
   onSelectPopulation?: (id: string) => void;
@@ -10,6 +11,8 @@ interface PopulationManagerProps {
 export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPopulation }) => {
   const config = useSyntheaConfig();
   const { populations, isLoading, error, deletePopulation, refetch } = usePopulations();
+  const populationList = Array.isArray(populations) ? populations : [];
+  const [importingIds, setImportingIds] = useState<Set<string>>(new Set());
 
   const handleStartGeneration = async (populationId: string) => {
     try {
@@ -18,6 +21,24 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
     } catch (error) {
       console.error('Failed to start generation:', error);
       config.callbacks.onError?.(error as Error);
+    }
+  };
+
+  const handleImportToFHIR = async (populationId: string) => {
+    setImportingIds(prev => new Set([...prev, populationId]));
+    try {
+      await importToFHIR(config.apiUrl, populationId);
+      toast.success('Successfully imported to FHIR');
+      refetch(); // Refresh the list
+    } catch (error: any) {
+      console.error('Failed to import to FHIR:', error);
+      toast.error(error.message || 'Failed to import to FHIR');
+    } finally {
+      setImportingIds(prev => {
+        const next = new Set(prev);
+        next.delete(populationId);
+        return next;
+      });
     }
   };
 
@@ -42,11 +63,11 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-gray-900">Populations</h2>
         <div className="text-sm text-gray-500">
-          {populations.length} population{populations.length !== 1 && 's'}
+          {populationList.length} population{populationList.length !== 1 && 's'}
         </div>
       </div>
 
-      {populations.length === 0 ? (
+      {populationList.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <p className="text-gray-500">No populations yet</p>
           {config.features.allowCreate && (
@@ -57,7 +78,7 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {populations.map((population) => (
+          {populationList.map((population) => (
             <div
               key={population.id}
               className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -82,7 +103,7 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
 
               <div className="text-sm text-gray-600 space-y-1">
                 <p>Size: {population.patient_count} patients</p>
-                <p>Created: {new Date(population.created_at).toLocaleDateString()}</p>
+                <p>Created: {population.created_at ? new Date(population.created_at).toLocaleDateString() : 'Unknown'}</p>
                 {population.description && (
                   <p className="text-gray-500 truncate">{population.description}</p>
                 )}
@@ -90,19 +111,28 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
                   <div className="mt-2">
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                       <span>Progress</span>
-                      <span>{population.progress}%</span>
+                      <span>
+                        {typeof population.progress === 'object'
+                          ? `${population.progress.current}/${population.progress.total}`
+                          : `${population.progress}%`}
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${population.progress}%` }}
+                        style={{ width: typeof population.progress === 'number' ? `${population.progress}%` : `${population.progress.percentage}%` }}
                       />
                     </div>
+                    {typeof population.progress === 'object' && (
+                      <div className="text-xs text-gray-400 mt-1 text-center">
+                        {population.progress.percentage}% complete
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-2 flex-wrap">
                 {population.status.toLowerCase() === 'pending' && (
                   <button
                     onClick={(e) => {
@@ -112,6 +142,18 @@ export const PopulationManager: React.FC<PopulationManagerProps> = ({ onSelectPo
                     className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
                   >
                     Start Generation
+                  </button>
+                )}
+                {population.status.toLowerCase() === 'completed' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleImportToFHIR(population.id);
+                    }}
+                    disabled={importingIds.has(population.id)}
+                    className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importingIds.has(population.id) ? 'Importing...' : 'Import to FHIR'}
                   </button>
                 )}
                 {config.features.allowExport && population.status.toLowerCase() === 'completed' && (

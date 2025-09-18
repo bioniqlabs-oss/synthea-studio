@@ -38,7 +38,7 @@ export const PopulationDetailsModal: React.FC<PopulationDetailsModalProps> = ({ 
               <div className="flex items-center gap-3 mt-2">
                 <StatusBadge status={population.status} />
                 <span className="text-sm text-gray-500">
-                  Created {new Date(population.created_at).toLocaleDateString()}
+                  Created {population.created_at ? new Date(population.created_at).toLocaleDateString() : 'Unknown'}
                 </span>
               </div>
             )}
@@ -90,14 +90,14 @@ export const PopulationDetailsModal: React.FC<PopulationDetailsModalProps> = ({ 
                     {population.status === 'generating' && population.progress !== undefined && (
                       <div className="bg-blue-50 p-4 rounded-lg">
                         <div className="text-sm text-blue-600">Progress</div>
-                        <div className="text-2xl font-bold text-blue-700">{population.progress}%</div>
+                        <div className="text-2xl font-bold text-blue-700">{typeof population.progress === 'number' ? `${population.progress}%` : `${population.progress.percentage}%`}</div>
                       </div>
                     )}
                     {population.completed_at && (
                       <div className="bg-green-50 p-4 rounded-lg">
                         <div className="text-sm text-green-600">Duration</div>
                         <div className="text-2xl font-bold text-green-700">
-                          {Math.round((new Date(population.completed_at).getTime() - new Date(population.created_at).getTime()) / 60000)} min
+                          {population.created_at ? Math.round((new Date(population.completed_at).getTime() - new Date(population.created_at).getTime()) / 60000) : 0} min
                         </div>
                       </div>
                     )}
@@ -107,12 +107,16 @@ export const PopulationDetailsModal: React.FC<PopulationDetailsModalProps> = ({ 
                     <div>
                       <div className="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Generation Progress</span>
-                        <span>{population.progress}%</span>
+                        <span>
+                          {typeof population.progress === 'object'
+                            ? `${population.progress.current} / ${population.progress.total} patients (${population.progress.percentage}%)`
+                            : `${population.progress}%`}
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
                           className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${population.progress}%` }}
+                          style={{ width: typeof population.progress === 'number' ? `${population.progress}%` : `${population.progress.percentage}%` }}
                         />
                       </div>
                     </div>
@@ -164,7 +168,7 @@ export const PopulationDetailsModal: React.FC<PopulationDetailsModalProps> = ({ 
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-gray-200">
                           <div className="text-sm text-gray-500">Total Size</div>
-                          <div className="font-medium">~{Math.round(population.patient_count * 0.5)} MB</div>
+                          <div className="font-medium">~{Math.round((population.patient_count || 0) * 0.5)} MB</div>
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-gray-200">
                           <div className="text-sm text-gray-500">Records</div>

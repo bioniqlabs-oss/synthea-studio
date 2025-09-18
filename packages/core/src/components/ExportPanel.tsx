@@ -8,7 +8,8 @@ export const ExportPanel: React.FC = () => {
   const [selectedPopulation, setSelectedPopulation] = useState('');
   const [format, setFormat] = useState<'fhir' | 'csv' | 'ccda' | 'ndjson'>('fhir');
 
-  const completedPopulations = populations.filter(p => p.status.toLowerCase() === 'completed');
+  const populationList = Array.isArray(populations) ? populations : [];
+  const completedPopulations = populationList.filter(p => p.status.toLowerCase() === 'completed');
 
   const handleExport = async () => {
     if (!selectedPopulation) return;

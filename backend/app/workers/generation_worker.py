@@ -18,6 +18,8 @@ from app.services.synthea_wrapper import SyntheaWrapper
 from app.models.population import Population, PopulationStatus
 from app.models.job import GenerationJob
 from app.core.config import settings
+import glob
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +125,15 @@ def generate_population(
         
         # Update population with results
         update_progress(90, "Finalizing population data...")
-        
+
         population.status = PopulationStatus.COMPLETED
         population.patient_count = result["patient_count"]
         population.storage_path = result["output_path"]
         population.completed_at = datetime.utcnow()
+
+        # Auto-import generated patients to FHIR store
+        update_progress(95, "Importing patients to FHIR store...")
+        import_patients_to_fhir(population_id, result["output_path"])
         
         # Update job
         job.progress = 100
@@ -187,6 +193,81 @@ def generate_population(
     finally:
         if db:
             db.close()
+
+
+def import_patients_to_fhir(population_id: str, output_path: str):
+    """
+    Import generated FHIR bundles into the FHIR store
+
+    Args:
+        population_id: Population ID
+        output_path: Path to generated FHIR files
+    """
+    import requests
+
+    try:
+        # Find all FHIR bundle files
+        fhir_path = os.path.join(output_path, "fhir")
+        if not os.path.exists(fhir_path):
+            logger.warning(f"No FHIR output found at {fhir_path}")
+            return
+
+        bundle_files = glob.glob(os.path.join(fhir_path, "*.json"))
+        logger.info(f"Found {len(bundle_files)} FHIR bundles to import")
+
+        # Import each bundle
+        imported_count = 0
+        failed_count = 0
+
+        for bundle_file in bundle_files:
+            try:
+                with open(bundle_file, 'r') as f:
+                    bundle_data = json.load(f)
+
+                # Post entire bundle to FHIR server
+                if bundle_data.get("resourceType") == "Bundle":
+                    try:
+                        # Use the Bundle transaction endpoint
+                        response = requests.post(
+                            "http://synthea-backend:8001/fhir/",
+                            json=bundle_data,
+                            headers={"Content-Type": "application/json"}
+                        )
+
+                        if response.status_code in [200, 201]:
+                            # Count successful imports from response
+                            response_data = response.json()
+                            if response_data.get("resourceType") == "Bundle":
+                                for entry in response_data.get("entry", []):
+                                    if entry.get("response", {}).get("status", "").startswith("20"):
+                                        imported_count += 1
+                            logger.debug(f"Successfully imported bundle from {os.path.basename(bundle_file)}")
+                        else:
+                            logger.warning(f"Failed to import bundle {os.path.basename(bundle_file)}: {response.status_code}")
+                            failed_count += 1
+                    except Exception as e:
+                        logger.error(f"Error importing bundle {os.path.basename(bundle_file)}: {e}")
+                        failed_count += 1
+
+            except Exception as e:
+                logger.error(f"Error processing bundle file {bundle_file}: {e}")
+
+        logger.info(f"Import complete for population {population_id}: {imported_count} resources imported, {failed_count} bundles failed")
+
+        # Store import stats in Redis
+        redis_client.setex(
+            f"population:{population_id}:import_stats",
+            3600,
+            json.dumps({
+                "imported_count": imported_count,
+                "failed_count": failed_count,
+                "bundle_count": len(bundle_files),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to import patients for population {population_id}: {e}")
 
 
 @celery_app.task

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import populations, generation, export
+from app.api import populations, generation, export, fhir
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(populations.router, prefix="/api/populations", tags=["populations"])
 app.include_router(generation.router, prefix="/api/generation", tags=["generation"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
+app.include_router(fhir.router, prefix="/fhir", tags=["fhir"])
 
 
 @app.get("/")

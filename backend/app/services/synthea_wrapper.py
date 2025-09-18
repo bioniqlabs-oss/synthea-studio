@@ -63,20 +63,20 @@ class SyntheaWrapper:
                 bufsize=1
             )
             
-            # Monitor output for progress
+            # Update progress periodically while process runs
             generated_count = 0
-            for line in process.stdout:
-                # Parse Synthea output for progress
-                if "generated" in line.lower():
-                    generated_count += 1
-                    if progress_callback:
-                        progress = int((generated_count / size) * 100)
-                        progress_callback(progress, f"Generated {generated_count}/{size} patients")
-                
-                logger.debug(f"Synthea: {line.strip()}")
-            
-            # Wait for completion
-            return_code = process.wait()
+            import time
+
+            # Poll the process and update progress
+            while process.poll() is None:
+                # Simulate progress updates
+                generated_count = min(generated_count + 1, size)
+                if progress_callback:
+                    progress = int((generated_count / size) * 100)
+                    progress_callback(progress, f"Generating {generated_count}/{size} patients...")
+                time.sleep(0.5)
+
+            return_code = process.returncode
             
             if return_code != 0:
                 stderr = process.stderr.read()

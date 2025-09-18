@@ -3,8 +3,16 @@
   "version": "1.0.0",
   "description": "Synthea Studio Core - Embeddable synthetic patient data generator",
   "main": "dist/synthea-studio.umd.js",
-  "module": "dist/synthea-studio.es.js",
-  "types": "dist/index.d.ts",
+  "module": "dist/synthea-studio.mjs",
+  "types": "src/SyntheaStudio.tsx",
+  "style": "dist/synthea-studio.css",
+  "exports": {
+    ".": {
+      "import": "./dist/synthea-studio.mjs",
+      "require": "./dist/synthea-studio.umd.js"
+    },
+    "./dist/synthea-studio.css": "./dist/synthea-studio.css"
+  },
   "files": [
     "dist",
     "src"

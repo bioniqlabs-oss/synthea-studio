@@ -1,15 +1,5 @@
 import axios from 'axios';
-
-export interface Population {
-  id: string;
-  name: string;
-  description?: string;
-  patient_count: number;
-  status: string;
-  config: any;
-  created_at: string;
-  completed_at?: string;
-}
+import { Population } from '../types';
 
 export async function getPopulations(apiUrl: string): Promise<Population[]> {
   const response = await axios.get(`${apiUrl}/api/populations/`);
@@ -69,6 +59,15 @@ export async function startGeneration(apiUrl: string, id: string): Promise<{
 
 export async function stopGeneration(apiUrl: string, id: string): Promise<{ message: string }> {
   const response = await axios.post(`${apiUrl}/api/generation/${id}/stop`);
+  return response.data;
+}
+
+export async function importToFHIR(apiUrl: string, id: string): Promise<{
+  message: string;
+  population_id: string;
+  storage_path: string;
+}> {
+  const response = await axios.post(`${apiUrl}/api/generation/${id}/import`);
   return response.data;
 }
 

@@ -2,39 +2,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSyntheaConfig } from '../contexts/SyntheaContext';
 import * as api from '../services/api';
 import { useEffect, useRef } from 'react';
-
-export interface Population {
-  id: string;
-  name: string;
-  description?: string;
-  patient_count: number;
-  status: 'pending' | 'generating' | 'completed' | 'failed';
-  progress?: number;
-  config: any;
-  created_at: string;
-  completed_at?: string;
-}
+import { Population } from '../types';
 
 export const usePopulations = () => {
   const config = useSyntheaConfig();
   const queryClient = useQueryClient();
   const websockets = useRef<Map<string, api.ProgressWebSocket>>(new Map());
 
-  const { data: populations = [], isLoading, error, refetch } = useQuery<Population[], Error>({
-    queryKey: ['populations'],
-    queryFn: () => api.getPopulations(config.apiUrl),
-    refetchInterval: 10000, // Reduced frequency since we have WebSocket updates
-  });
+  const { data: populations = [], isLoading, error, refetch } = useQuery<Population[], Error>(
+    ['populations'],
+    () => api.getPopulations(config.apiUrl),
+    {
+      refetchInterval: 10000, // Reduced frequency since we have WebSocket updates
+    }
+  );
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.deletePopulation(config.apiUrl, id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['populations'] });
-    },
-    onError: (error) => {
-      config.callbacks.onError?.(error as Error);
-    },
-  });
+  const deleteMutation = useMutation(
+    (id: string) => api.deletePopulation(config.apiUrl, id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['populations']);
+      },
+      onError: (error) => {
+        config.callbacks.onError?.(error as Error);
+      },
+    }
+  );
 
   // Set up WebSocket connections for generating populations
   useEffect(() => {

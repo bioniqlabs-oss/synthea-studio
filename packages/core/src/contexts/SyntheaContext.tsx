@@ -6,12 +6,12 @@ interface SyntheaConfig {
   mode: 'full' | 'compact' | 'widget';
   theme: 'light' | 'dark' | 'auto';
   features: {
-    showHeader: boolean;
-    showNavigation: boolean;
-    allowCreate: boolean;
-    allowDelete: boolean;
-    allowExport: boolean;
-    showAdvancedConfig: boolean;
+    showHeader?: boolean;
+    showNavigation?: boolean;
+    allowCreate?: boolean;
+    allowDelete?: boolean;
+    allowExport?: boolean;
+    showAdvancedConfig?: boolean;
   };
   callbacks: {
     onPopulationCreated?: (population: any) => void;
