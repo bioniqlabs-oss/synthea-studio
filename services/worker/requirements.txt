@@ -1,0 +1,21 @@
+# Core dependencies
+celery==5.3.4
+redis==5.0.1
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Synthea wrapper
+requests==2.31.0
+
+# Shared library (local install)
+-e ../../packages/shared
+
+# Development dependencies
+pytest==7.4.0
+pytest-asyncio==0.21.0
+pytest-cov==4.1.0
+black==23.0.0
+mypy==1.4.0

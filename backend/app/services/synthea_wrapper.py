@@ -19,10 +19,12 @@ class SyntheaWrapper:
     
     def __init__(self):
         self.synthea_jar = Path(settings.SYNTHEA_JAR_PATH)
-        self.output_path = Path(settings.SYNTHEA_OUTPUT_PATH)
-        
-        # Ensure output directory exists
-        self.output_path.mkdir(parents=True, exist_ok=True)
+        self.temp_output_path = Path(settings.SYNTHEA_OUTPUT_PATH)  # Temp generation path
+        self.storage_path = Path(settings.STORAGE_PATH)  # Permanent storage path
+
+        # Ensure directories exist
+        self.temp_output_path.mkdir(parents=True, exist_ok=True)
+        self.storage_path.mkdir(parents=True, exist_ok=True)
     
     def generate_population(
         self,
@@ -43,54 +45,76 @@ class SyntheaWrapper:
         Returns:
             Dictionary with generation results and paths to output files
         """
-        # Create unique output directory for this population
-        population_output = self.output_path / population_id
-        population_output.mkdir(parents=True, exist_ok=True)
+        # Generate to temp directory first
+        temp_output = self.temp_output_path / population_id
+        temp_output.mkdir(parents=True, exist_ok=True)
+
+        # Final storage location
+        final_output = self.storage_path / population_id
         
         # Build Synthea command
-        cmd = self._build_command(size, config, population_output)
-        
+        cmd = self._build_command(size, config, temp_output)
+
         logger.info(f"Starting Synthea generation for {population_id}")
-        logger.debug(f"Command: {' '.join(cmd)}")
+        logger.info(f"Command: {' '.join(cmd)}")
+        logger.info(f"Config received: {config}")
         
         try:
-            # Run Synthea with progress monitoring
+            # Run Synthea with proper output handling
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1
+                text=True
             )
-            
-            # Update progress periodically while process runs
-            generated_count = 0
+
+            # Wait for the process to complete with timeout
             import time
 
-            # Poll the process and update progress
-            while process.poll() is None:
-                # Simulate progress updates
-                generated_count = min(generated_count + 1, size)
-                if progress_callback:
-                    progress = int((generated_count / size) * 100)
-                    progress_callback(progress, f"Generating {generated_count}/{size} patients...")
-                time.sleep(0.5)
+            # Send initial progress
+            if progress_callback:
+                progress_callback(10, f"Starting Synthea generation...")
 
-            return_code = process.returncode
-            
+            try:
+                stdout, stderr = process.communicate(timeout=300)  # 5 minute timeout
+                return_code = process.returncode
+
+                # Send completion progress
+                if progress_callback and return_code == 0:
+                    progress_callback(90, f"Generation complete, processing files...")
+
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+                raise RuntimeError(f"Synthea generation timed out after 5 minutes")
+
             if return_code != 0:
-                stderr = process.stderr.read()
+                logger.error(f"Synthea stderr: {stderr}")
                 raise RuntimeError(f"Synthea failed with code {return_code}: {stderr}")
-            
-            # Collect generated files
-            result = self._collect_output_files(population_output)
-            
-            logger.info(f"Successfully generated {size} patients for {population_id}")
-            
+
+            logger.info(f"Synthea completed successfully. Output: {stdout[:500]}")
+
+            # Move files from temp to permanent storage
+            import shutil
+            if final_output.exists():
+                shutil.rmtree(final_output)
+            shutil.move(str(temp_output), str(final_output))
+
+            # Collect generated files from permanent location
+            result = self._collect_output_files(final_output)
+
+            # Count actual patient files generated (exclude hospital and practitioner info)
+            actual_patient_count = len([
+                f for f in result.get("fhir", [])
+                if not any(x in f.lower() for x in ["hospital", "practitioner"])
+            ])
+
+            logger.info(f"Successfully generated {actual_patient_count} patients for {population_id} (requested: {size})")
+
             return {
                 "population_id": population_id,
-                "patient_count": size,
-                "output_path": str(population_output),
+                "patient_count": actual_patient_count,
+                "output_path": str(final_output),
                 "files": result
             }
             
@@ -114,13 +138,29 @@ class SyntheaWrapper:
         ]
         
         # Add optional parameters
-        if "seed" in config:
+        if config.get("seed"):
             cmd.extend(["-s", str(config["seed"])])
-        
+
+        if config.get("clinician_seed"):
+            cmd.extend(["-cs", str(config["clinician_seed"])])
+
+        if config.get("reference_date"):
+            # Format: YYYYMMDD
+            date_str = config["reference_date"].replace("-", "")
+            cmd.extend(["-r", date_str])
+
+        if config.get("end_date"):
+            # Format: YYYYMMDD
+            date_str = config["end_date"].replace("-", "")
+            cmd.extend(["-e", date_str])
+
+        if config.get("overflow_population", 0) > 0:
+            cmd.extend(["-o", str(config["overflow_population"])])
+
         if "age_range" in config:
             min_age, max_age = config["age_range"]
             cmd.extend(["-a", f"{min_age}-{max_age}"])
-        
+
         if "gender" in config:
             cmd.extend(["-g", config["gender"]])
         
@@ -146,9 +186,11 @@ class SyntheaWrapper:
         # State and city are positional arguments at the end
         state = config.get("state", settings.SYNTHEA_DEFAULT_STATE)
         cmd.append(state)
-        
-        if "city" in config:
-            cmd.append(config["city"])
+
+        # Only add city if it's not empty
+        city = config.get("city", "")
+        if city and city.strip():
+            cmd.append(city)
         
         return cmd
     

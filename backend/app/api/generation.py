@@ -7,6 +7,7 @@ from sqlalchemy import select
 import json
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models import Population, GenerationJob
 from app.models.population import PopulationStatus
 from app.workers.celery_app import celery_app
@@ -143,6 +144,7 @@ async def generation_progress(
 ):
     """WebSocket endpoint for real-time generation progress"""
     await websocket.accept()
+    print(f"WebSocket accepted for population {population_id}")
 
     import aioredis
     import asyncio
@@ -158,12 +160,14 @@ async def generation_progress(
         population = result.scalar_one_or_none()
 
         if not population:
+            print(f"Population {population_id} not found")
             await websocket.send_text(json.dumps({
                 "error": "Population not found"
             }))
             await websocket.close()
             return
 
+        print(f"Connecting to Redis for population {population_id}")
         # Connect to Redis and subscribe to progress updates
         redis = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         pubsub = redis.pubsub()
@@ -222,13 +226,28 @@ async def generation_progress(
                     continue
 
     except Exception as e:
-        await websocket.send_text(json.dumps({
-            "error": str(e)
-        }))
+        print(f"WebSocket exception for {population_id}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        try:
+            await websocket.send_text(json.dumps({
+                "error": str(e)
+            }))
+        except:
+            pass  # WebSocket might already be closed
     finally:
         if pubsub:
-            await pubsub.unsubscribe()
-            await pubsub.close()
+            try:
+                await pubsub.unsubscribe()
+                await pubsub.close()
+            except:
+                pass
         if redis:
-            await redis.close()
-        await websocket.close()
+            try:
+                await redis.close()
+            except:
+                pass
+        try:
+            await websocket.close()
+        except:
+            pass  # WebSocket might already be closed

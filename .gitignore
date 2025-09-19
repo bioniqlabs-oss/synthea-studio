@@ -98,4 +98,5 @@ minio-data/
 # Temporary files
 *.tmp
 tmp/
-temp/
+temp/storage/
+backend/synthea/synthea-with-dependencies.jar

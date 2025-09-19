@@ -1,6 +1,7 @@
 """
 Population management endpoints
 """
+import logging
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,8 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.models import Population
 from app.models.population import PopulationStatus
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -130,9 +133,27 @@ async def create_population(
     db.add(population)
     await db.commit()
     await db.refresh(population)
-    
-    # TODO: Trigger generation job via Celery
-    
+
+    # Trigger generation job via Celery
+    from app.workers.celery_app import celery_app
+    from app.models.job import GenerationJob
+
+    task = celery_app.send_task(
+        'app.workers.generation_worker.generate_population',
+        args=[population_id, population.patient_count, dict(population.config)]
+    )
+
+    # Create job record
+    job = GenerationJob(
+        population_id=population_id,
+        celery_task_id=task.id
+    )
+    db.add(job)
+
+    # Update population status
+    population.status = PopulationStatus.GENERATING
+    await db.commit()
+
     return PopulationResponse(
         id=population.id,
         name=population.name,
@@ -143,6 +164,74 @@ async def create_population(
         created_at=population.created_at,
         completed_at=population.completed_at
     )
+
+
+@router.get("/{population_id}/statistics")
+async def get_population_statistics(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get statistics for a specific population"""
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    # Return basic statistics for now
+    # In a real implementation, this would query FHIR data
+    return {
+        "population_id": population_id,
+        "patient_count": population.patient_count,
+        "status": population.status.value,
+        "created_at": population.created_at,
+        "completed_at": population.completed_at,
+        "demographics": {
+            "total": population.patient_count,
+            "by_gender": population.config.get("gender_distribution", {}),
+            "age_range": population.config.get("age_range", [0, 100])
+        },
+        "conditions": {
+            "modules_used": population.config.get("modules", [])
+        }
+    }
+
+
+@router.get("/{population_id}/status")
+async def get_population_status(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get generation status for a population"""
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    # Get associated job if exists
+    from app.models.job import GenerationJob
+    job_result = await db.execute(
+        select(GenerationJob)
+        .where(GenerationJob.population_id == population_id)
+        .order_by(GenerationJob.created_at.desc())
+        .limit(1)
+    )
+    job = job_result.scalar_one_or_none()
+
+    return {
+        "population_id": population_id,
+        "status": population.status.value,
+        "progress": job.progress if job else 0,
+        "created_at": population.created_at,
+        "completed_at": population.completed_at,
+        "job_id": str(job.id) if job else None,
+        "celery_task_id": job.celery_task_id if job else None
+    }
 
 
 @router.delete("/{population_id}")
@@ -159,18 +248,22 @@ async def delete_population(
     if not population:
         raise HTTPException(status_code=404, detail="Population not found")
     
-    # Delete related generation jobs first
-    from app.models import GenerationJob
-    await db.execute(
-        delete(GenerationJob).where(GenerationJob.population_id == population_id)
-    )
-    
-    # TODO: Delete storage artifacts
-    
-    # Now delete the population
-    await db.execute(
-        delete(Population).where(Population.id == population_id)
-    )
+    # Delete storage artifacts if they exist
+    if population.storage_path:
+        import shutil
+        from pathlib import Path
+        storage_path = Path(population.storage_path)
+        if storage_path.exists():
+            try:
+                shutil.rmtree(storage_path)
+                logger.info(f"Deleted storage artifacts at {storage_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete storage artifacts: {e}")
+                # Continue with deletion even if file cleanup fails
+
+    # Delete the population (cascade will handle related records)
+    await db.delete(population)
     await db.commit()
-    
+
+    logger.info(f"Successfully deleted population {population_id}")
     return {"message": f"Population {population_id} deleted successfully"}

@@ -7,15 +7,17 @@ from datetime import datetime
 import json
 import uuid
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.population import Population
+from app.models.fhir_resource import FhirResource
 from fastapi import Depends
 
 router = APIRouter()
 
-# In-memory FHIR storage for now (will be replaced with database)
+# Keep in-memory store for backward compatibility during transition
 fhir_store: Dict[str, List[Dict[str, Any]]] = {
     "Patient": [],
     "Condition": [],
@@ -177,13 +179,32 @@ async def search_patients(
     _offset: int = Query(0, alias="_offset"),
     name: Optional[str] = None,
     gender: Optional[str] = None,
-    birthdate: Optional[str] = None
+    birthdate: Optional[str] = None,
+    population_id: Optional[str] = Query(None, description="Filter by population ID"),
+    identifier: Optional[str] = Query(None, description="Filter by identifier (population)"),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Search for patients"""
-    # Filter patients based on search parameters
-    patients = fhir_store.get("Patient", [])
-    filtered = patients
+    """Search for patients from PostgreSQL"""
+    from sqlalchemy import select, func
 
+    # Build query
+    query = select(FhirResource).where(FhirResource.resource_type == "Patient")
+
+    # Filter by population if specified
+    if population_id:
+        query = query.where(FhirResource.population_id == population_id)
+
+    # Filter by identifier (can be used for population filtering)
+    if identifier and identifier.startswith("pop_"):
+        query = query.where(FhirResource.population_id == identifier)
+
+    # Get all matching patients
+    result = await db.execute(query.offset(_offset).limit(_count))
+    patient_resources = result.scalars().all()
+    patients = [r.resource_data for r in patient_resources]
+
+    # Apply additional filters on JSON data
+    filtered = patients
     if name:
         filtered = [p for p in filtered if any(
             name.lower() in n.get("family", "").lower() or
@@ -197,22 +218,34 @@ async def search_patients(
     if birthdate:
         filtered = [p for p in filtered if p.get("birthDate", "") == birthdate]
 
-    # Paginate
-    total = len(filtered)
-    start = _offset
-    end = min(start + _count, total)
-    page_results = filtered[start:end]
+    # Count total
+    count_query = select(func.count()).select_from(FhirResource).where(FhirResource.resource_type == "Patient")
+    if population_id:
+        count_query = count_query.where(FhirResource.population_id == population_id)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
 
-    return create_bundle("Patient", page_results, total, _offset, _count)
+    return create_bundle("Patient", filtered, total, _offset, _count)
 
 
 @router.get("/Patient/{patient_id}")
-async def get_patient(patient_id: str):
-    """Get a specific patient by ID"""
-    patients = [p for p in fhir_store.get("Patient", []) if p.get("id") == patient_id]
-    if not patients:
+async def get_patient(patient_id: str, db: AsyncSession = Depends(get_db)):
+    """Get a specific patient by ID from PostgreSQL"""
+    from sqlalchemy import select
+
+    query = select(FhirResource).where(
+        and_(
+            FhirResource.resource_type == "Patient",
+            FhirResource.resource_id == patient_id
+        )
+    )
+    result = await db.execute(query)
+    resource = result.scalar_one_or_none()
+
+    if not resource:
         raise HTTPException(status_code=404, detail="Patient not found")
-    return patients[0]
+
+    return resource.resource_data
 
 
 @router.post("/Patient")

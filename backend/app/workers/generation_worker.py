@@ -17,6 +17,7 @@ from app.workers.celery_app import celery_app
 from app.services.synthea_wrapper import SyntheaWrapper
 from app.models.population import Population, PopulationStatus
 from app.models.job import GenerationJob
+from app.models.fhir_resource import FhirResource  # Import to resolve relationship
 from app.core.config import settings
 import glob
 import os
@@ -197,14 +198,17 @@ def generate_population(
 
 def import_patients_to_fhir(population_id: str, output_path: str):
     """
-    Import generated FHIR bundles into the FHIR store
+    Import generated FHIR bundles into PostgreSQL
 
     Args:
         population_id: Population ID
         output_path: Path to generated FHIR files
     """
-    import requests
+    from app.models.fhir_resource import FhirResource
+    import uuid
 
+    # Use the SessionLocal already defined in this module
+    db = SessionLocal()
     try:
         # Find all FHIR bundle files
         fhir_path = os.path.join(output_path, "fhir")
@@ -217,57 +221,69 @@ def import_patients_to_fhir(population_id: str, output_path: str):
 
         # Import each bundle
         imported_count = 0
-        failed_count = 0
+        patient_count = 0
 
         for bundle_file in bundle_files:
             try:
                 with open(bundle_file, 'r') as f:
                     bundle_data = json.load(f)
 
-                # Post entire bundle to FHIR server
-                if bundle_data.get("resourceType") == "Bundle":
-                    try:
-                        # Use the Bundle transaction endpoint
-                        response = requests.post(
-                            "http://synthea-backend:8001/fhir/",
-                            json=bundle_data,
-                            headers={"Content-Type": "application/json"}
-                        )
+                # Process bundle entries
+                if bundle_data.get("resourceType") == "Bundle" and "entry" in bundle_data:
+                    for entry in bundle_data.get("entry", []):
+                        resource = entry.get("resource", {})
+                        resource_type = resource.get("resourceType")
 
-                        if response.status_code in [200, 201]:
-                            # Count successful imports from response
-                            response_data = response.json()
-                            if response_data.get("resourceType") == "Bundle":
-                                for entry in response_data.get("entry", []):
-                                    if entry.get("response", {}).get("status", "").startswith("20"):
-                                        imported_count += 1
-                            logger.debug(f"Successfully imported bundle from {os.path.basename(bundle_file)}")
-                        else:
-                            logger.warning(f"Failed to import bundle {os.path.basename(bundle_file)}: {response.status_code}")
-                            failed_count += 1
-                    except Exception as e:
-                        logger.error(f"Error importing bundle {os.path.basename(bundle_file)}: {e}")
-                        failed_count += 1
+                        if resource_type:
+                            # Generate resource ID if not present
+                            if "id" not in resource:
+                                resource["id"] = str(uuid.uuid4())
+
+                            # Add population identifier
+                            if "identifier" not in resource:
+                                resource["identifier"] = []
+                            resource["identifier"].append({
+                                "system": "http://synthea-studio/population",
+                                "value": population_id
+                            })
+
+                            # Save to PostgreSQL
+                            fhir_resource = FhirResource(
+                                resource_type=resource_type,
+                                resource_id=resource["id"],
+                                population_id=population_id,
+                                resource_data=resource
+                            )
+                            db.add(fhir_resource)
+                            imported_count += 1
+
+                            if resource_type == "Patient":
+                                patient_count += 1
 
             except Exception as e:
                 logger.error(f"Error processing bundle file {bundle_file}: {e}")
 
-        logger.info(f"Import complete for population {population_id}: {imported_count} resources imported, {failed_count} bundles failed")
+        # Commit all resources to database
+        db.commit()
+        logger.info(f"Import complete: {patient_count} patients, {imported_count} total resources for population {population_id}")
 
         # Store import stats in Redis
         redis_client.setex(
             f"population:{population_id}:import_stats",
             3600,
             json.dumps({
+                "patient_count": patient_count,
                 "imported_count": imported_count,
-                "failed_count": failed_count,
                 "bundle_count": len(bundle_files),
                 "timestamp": datetime.utcnow().isoformat()
             })
         )
 
     except Exception as e:
+        db.rollback()
         logger.error(f"Failed to import patients for population {population_id}: {e}")
+    finally:
+        db.close()
 
 
 @celery_app.task
