@@ -40,6 +40,7 @@ build/
 .env.production.local
 
 # Synthea outputs
+storage/pop_*
 storage/populations/*
 storage/exports/*
 !storage/populations/.gitkeep
@@ -98,4 +99,5 @@ minio-data/
 # Temporary files
 *.tmp
 tmp/
-temp/
+temp/storage/
+backend/synthea/synthea-with-dependencies.jar

@@ -1,296 +1,288 @@
-import axios from 'axios';
+/**
+ * API Service - Centralized API client using the Gateway
+ */
 
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { toast } from 'react-hot-toast';
+
+// API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8001';
+const API_TIMEOUT = 30000;
 
 // Create axios instance
-const apiClient = axios.create({
+const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor for auth (if needed later)
+// Request interceptor
 apiClient.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     // Add auth token if available
-    const token = localStorage.getItem('token');
-    if (token) {
+    const token = localStorage.getItem('auth_token');
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Add request ID for tracking
+    config.headers['X-Request-ID'] = crypto.randomUUID();
+
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized
-      console.error('Unauthorized access');
+  (error: AxiosError<{ error: string; detail: string }>) => {
+    // Handle different error types
+    if (error.response) {
+      const status = error.response.status;
+      const message = error.response.data?.detail || error.response.data?.error;
+
+      switch (status) {
+        case 401:
+          // Unauthorized - redirect to login
+          localStorage.removeItem('auth_token');
+          window.location.href = '/login';
+          toast.error('Session expired. Please login again.');
+          break;
+        case 429:
+          // Rate limited
+          toast.error('Too many requests. Please slow down.');
+          break;
+        case 503:
+          // Service unavailable
+          toast.error('Service temporarily unavailable. Please try again later.');
+          break;
+        default:
+          toast.error(message || `Error: ${status}`);
+      }
+    } else if (error.request) {
+      // Network error
+      toast.error('Network error. Please check your connection.');
     }
+
     return Promise.reject(error);
   }
 );
 
-// Types
-export interface Population {
-  id: string;
-  name: string;
-  description?: string;
-  patient_count: number;
-  status: 'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED';
-  config: PopulationConfig;
-  created_at: string;
-  completed_at?: string;
-}
-
-export interface PopulationConfig {
-  modules?: string[];
-  age_range?: [number, number];
-  gender?: string;
-  gender_distribution?: Record<string, number>;
-  state?: string;
-  city?: string;
-  export_fhir?: boolean;
-  export_csv?: boolean;
-  export_ccda?: boolean;
-  [key: string]: any;
-}
-
-export interface PopulationCreate {
-  name: string;
-  description?: string;
-  size: number;
-  config: PopulationConfig;
-}
-
-export interface GenerationJob {
-  id: string;
-  population_id: string;
-  progress: number;
-  message?: string;
-  error?: string;
-}
-
-// API endpoints
+// Population API
 export const populationApi = {
-  // List all populations
-  list: async (params?: { 
-    skip?: number; 
-    limit?: number; 
-    status?: string 
-  }): Promise<Population[]> => {
-    const response = await apiClient.get('/api/populations/', { params });
-    return response.data;
+  // List populations
+  list: async (params?: { limit?: number; offset?: number; status?: string }) => {
+    const response = await apiClient.get('/api/populations', { params });
+    // Backend returns array directly, wrap it for consistency
+    const data = response.data;
+    return { populations: Array.isArray(data) ? data : data.populations || [] };
   },
 
   // Get single population
-  get: async (id: string): Promise<Population> => {
+  get: async (id: string) => {
     const response = await apiClient.get(`/api/populations/${id}`);
     return response.data;
   },
 
-  // Create new population
-  create: async (data: PopulationCreate): Promise<Population> => {
+  // Create population
+  create: async (data: {
+    name: string;
+    size: number;
+    config: Record<string, any>;
+  }) => {
     const response = await apiClient.post('/api/populations', data);
     return response.data;
   },
 
   // Delete population
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/populations/${id}`);
-  },
-
-  // Start generation
-  startGeneration: async (id: string): Promise<{ 
-    message: string; 
-    population_id: string; 
-    job_id: string;
-  }> => {
-    const response = await apiClient.post(`/api/generation/${id}/start`);
+  delete: async (id: string) => {
+    const response = await apiClient.delete(`/api/populations/${id}`);
     return response.data;
   },
 
-  // Stop generation
-  stopGeneration: async (id: string): Promise<{ message: string }> => {
-    const response = await apiClient.post(`/api/generation/${id}/stop`);
+  // Get status
+  getStatus: async (id: string) => {
+    const response = await apiClient.get(`/api/populations/${id}/status`);
     return response.data;
   },
 
-  // Export population
-  export: async (id: string, format: 'fhir' | 'csv' | 'ndjson' | 'ccda' = 'fhir'): Promise<{
-    message: string;
-    download_url: string;
-  }> => {
-    // The export endpoint returns a file directly, not JSON
-    // So we'll open it directly in a new window
-    const url = `${API_BASE_URL}/api/export/${id}?format=${format}`;
-    window.open(url, '_blank');
-    return {
-      message: 'Download started',
-      download_url: url
-    };
+  // Get statistics
+  getStatistics: async (id: string) => {
+    const response = await apiClient.get(`/api/populations/${id}/statistics`);
+    return response.data;
+  },
+
+  // Manual import
+  import: async (id: string) => {
+    const response = await apiClient.post(`/api/populations/${id}/import`);
+    return response.data;
+  },
+
+  // Export population data
+  export: async (id: string, format: 'fhir' | 'csv' | 'ccda' | 'ndjson' = 'fhir') => {
+    const response = await apiClient.get(`/api/export/${id}`, {
+      params: { format },
+      responseType: 'blob',
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${id}_${format}.zip`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
   },
 };
 
-// WebSocket connection for progress updates
-export class ProgressWebSocket {
-  private ws: WebSocket | null = null;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
-  
-  connect(populationId: string, callbacks: {
-    onProgress?: (data: any) => void;
-    onError?: (error: any) => void;
-    onComplete?: () => void;
-  }) {
-    const wsUrl = `${WS_BASE_URL}/api/generation/ws/${populationId}`;
-    
-    this.ws = new WebSocket(wsUrl);
-    
-    this.ws.onopen = () => {
-      console.log(`WebSocket connected for population ${populationId}`);
-    };
-    
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.error && callbacks.onError) {
-          callbacks.onError(data.error);
-        } else if (data.progress !== undefined && callbacks.onProgress) {
-          callbacks.onProgress(data);
-          
-          if (data.progress === 100 && callbacks.onComplete) {
-            callbacks.onComplete();
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
-    
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      if (callbacks.onError) {
-        callbacks.onError('WebSocket connection error');
-      }
-    };
-    
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      // Auto-reconnect after 3 seconds
-      this.reconnectTimeout = setTimeout(() => {
-        this.connect(populationId, callbacks);
-      }, 3000);
-    };
-  }
-  
-  disconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
+// FHIR API
+export const fhirApi = {
+  // Search resources
+  search: async (
+    resourceType: string,
+    params?: {
+      population_id?: string;
+      patient?: string;
+      _count?: number;
+      _offset?: number;
     }
-    
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-}
-
-// Template loader
-export const templateApi = {
-  list: async (): Promise<any[]> => {
-    // For now, return static templates
-    // Later this could fetch from backend
-    return [
-      {
-        id: 'diabetes-study',
-        name: 'Diabetes Study Population',
-        description: 'Population focused on Type 2 diabetes patients',
-        size: 100
-      },
-      {
-        id: 'pediatric-asthma',
-        name: 'Pediatric Asthma Cohort',
-        description: 'Children with asthma and allergic conditions',
-        size: 50
-      },
-      {
-        id: 'general-population',
-        name: 'General Population',
-        description: 'Diverse general population baseline',
-        size: 200
-      },
-      {
-        id: 'cardiovascular-risk',
-        name: 'Cardiovascular Risk',
-        description: 'High risk for cardiovascular events',
-        size: 75
-      }
-    ];
+  ) => {
+    const response = await apiClient.get(`/fhir/${resourceType}`, { params });
+    return response.data;
   },
-  
-  load: async (id: string): Promise<PopulationCreate> => {
-    // Load template configuration
-    const templates: Record<string, PopulationCreate> = {
-      'diabetes-study': {
-        name: 'Diabetes Study Population',
-        description: 'Population focused on Type 2 diabetes patients with common comorbidities',
-        size: 100,
-        config: {
-          modules: ['diabetes', 'hypertension', 'metabolic_syndrome'],
-          age_range: [40, 75],
-          gender_distribution: { M: 0.52, F: 0.48 },
-          export_fhir: true,
-          export_csv: true,
-        }
-      },
-      'pediatric-asthma': {
-        name: 'Pediatric Asthma Cohort',
-        description: 'Children with asthma and allergic conditions',
-        size: 50,
-        config: {
-          modules: ['asthma', 'allergies', 'childhood_obesity'],
-          age_range: [5, 17],
-          gender_distribution: { M: 0.55, F: 0.45 },
-          export_fhir: true,
-        }
-      },
-      'general-population': {
-        name: 'General Population Baseline',
-        description: 'Diverse general population with typical disease distribution',
-        size: 200,
-        config: {
-          modules: [],
-          age_range: [0, 90],
-          gender_distribution: { M: 0.49, F: 0.51 },
-          export_fhir: true,
-          export_csv: true,
-        }
-      },
-      'cardiovascular-risk': {
-        name: 'Cardiovascular Risk Assessment',
-        description: 'Population at high risk for cardiovascular events',
-        size: 75,
-        config: {
-          modules: ['heart_disease', 'hypertension', 'hyperlipidemia'],
-          age_range: [45, 80],
-          gender_distribution: { M: 0.58, F: 0.42 },
-          export_fhir: true,
-          export_csv: true,
-        }
-      }
+
+  // Get resource
+  get: async (resourceType: string, id: string) => {
+    const response = await apiClient.get(`/fhir/${resourceType}/${id}`);
+    return response.data;
+  },
+
+  // Create resource
+  create: async (resourceType: string, resource: any) => {
+    const response = await apiClient.post(`/fhir/${resourceType}`, resource);
+    return response.data;
+  },
+
+  // Update resource
+  update: async (resourceType: string, id: string, resource: any) => {
+    const response = await apiClient.put(`/fhir/${resourceType}/${id}`, resource);
+    return response.data;
+  },
+
+  // Delete resource
+  delete: async (resourceType: string, id: string) => {
+    const response = await apiClient.delete(`/fhir/${resourceType}/${id}`);
+    return response.data;
+  },
+
+  // Global search
+  globalSearch: async (query: string, resourceTypes?: string[], limit?: number) => {
+    const params = {
+      query,
+      resource_types: resourceTypes,
+      limit,
     };
-    
-    return templates[id] || templates['general-population'];
-  }
+    const response = await apiClient.get('/fhir/_search', { params });
+    return response.data;
+  },
+
+  // Create bundle
+  createBundle: async (bundle: any) => {
+    const response = await apiClient.post('/fhir', bundle);
+    return response.data;
+  },
+};
+
+// Analytics API
+export const analyticsApi = {
+  // Overview
+  getOverview: async () => {
+    const response = await apiClient.get('/api/analytics/overview');
+    return response.data;
+  },
+
+  // Population analytics
+  getPopulationAnalytics: async (populationId: string) => {
+    const response = await apiClient.get(`/api/analytics/populations/${populationId}`);
+    return response.data;
+  },
+
+  // Condition analytics
+  getConditionAnalytics: async (populationId?: string, topN?: number) => {
+    const params = { population_id: populationId, top_n: topN };
+    const response = await apiClient.get('/api/analytics/conditions', { params });
+    return response.data;
+  },
+
+  // Demographics
+  getDemographics: async (populationId?: string) => {
+    const params = { population_id: populationId };
+    const response = await apiClient.get('/api/analytics/demographics', { params });
+    return response.data;
+  },
+
+  // Utilization
+  getUtilization: async (params?: {
+    population_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }) => {
+    const response = await apiClient.get('/api/analytics/utilization', { params });
+    return response.data;
+  },
+
+  // Trends
+  getTrends: async (metric: string, period?: string, days?: number) => {
+    const params = { metric, period, days };
+    const response = await apiClient.get('/api/analytics/trends', { params });
+    return response.data;
+  },
+
+  // Export
+  export: async (populationId?: string, format?: 'json' | 'csv' | 'excel') => {
+    const params = { population_id: populationId, format };
+    const response = await apiClient.get('/api/analytics/export', {
+      params,
+      responseType: format === 'json' ? 'json' : 'blob',
+    });
+    return response.data;
+  },
+};
+
+// Health API
+export const healthApi = {
+  // Get health status
+  getHealth: async () => {
+    const response = await apiClient.get('/health/');
+    return response.data;
+  },
+
+  // Get service status
+  getServices: async () => {
+    const response = await apiClient.get('/health/services');
+    return response.data;
+  },
+
+  // Get readiness
+  getReadiness: async () => {
+    const response = await apiClient.get('/health/ready');
+    return response.data;
+  },
+
+  // Get metrics
+  getMetrics: async () => {
+    const response = await apiClient.get('/health/metrics');
+    return response.data;
+  },
 };
 
 export default apiClient;

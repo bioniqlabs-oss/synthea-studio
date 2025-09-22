@@ -17,7 +17,10 @@ from app.workers.celery_app import celery_app
 from app.services.synthea_wrapper import SyntheaWrapper
 from app.models.population import Population, PopulationStatus
 from app.models.job import GenerationJob
+from app.models.fhir_resource import FhirResource  # Import to resolve relationship
 from app.core.config import settings
+import glob
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +126,15 @@ def generate_population(
         
         # Update population with results
         update_progress(90, "Finalizing population data...")
-        
+
         population.status = PopulationStatus.COMPLETED
         population.patient_count = result["patient_count"]
         population.storage_path = result["output_path"]
         population.completed_at = datetime.utcnow()
+
+        # Auto-import generated patients to FHIR store
+        update_progress(95, "Importing patients to FHIR store...")
+        import_patients_to_fhir(population_id, result["output_path"])
         
         # Update job
         job.progress = 100
@@ -187,6 +194,142 @@ def generate_population(
     finally:
         if db:
             db.close()
+
+
+@celery_app.task
+def import_patients_to_fhir_task(population_id: str, output_path: str):
+    """
+    Celery task to manually import FHIR data for a population
+
+    Args:
+        population_id: Population ID
+        output_path: Path to generated FHIR files
+
+    Returns:
+        Dict with import results
+    """
+    try:
+        logger.info(f"Starting manual import for population {population_id}")
+        import_patients_to_fhir(population_id, output_path)
+
+        # Count imported resources
+        db = SessionLocal()
+        try:
+            from app.models.fhir_resource import FhirResource
+            resource_count = db.query(FhirResource).filter_by(population_id=population_id).count()
+            patient_count = db.query(FhirResource).filter_by(
+                population_id=population_id,
+                resource_type="Patient"
+            ).count()
+        finally:
+            db.close()
+
+        logger.info(f"Successfully imported {patient_count} patients, {resource_count} total resources for population {population_id}")
+
+        return {
+            "success": True,
+            "population_id": population_id,
+            "patient_count": patient_count,
+            "resource_count": resource_count,
+            "message": f"Imported {patient_count} patients and {resource_count} total FHIR resources"
+        }
+    except Exception as e:
+        logger.error(f"Manual import failed for population {population_id}: {str(e)}")
+        return {
+            "success": False,
+            "population_id": population_id,
+            "error": str(e)
+        }
+
+
+def import_patients_to_fhir(population_id: str, output_path: str):
+    """
+    Import generated FHIR bundles into PostgreSQL
+
+    Args:
+        population_id: Population ID
+        output_path: Path to generated FHIR files
+    """
+    from app.models.fhir_resource import FhirResource
+    import uuid
+
+    # Use the SessionLocal already defined in this module
+    db = SessionLocal()
+    try:
+        # Find all FHIR bundle files
+        fhir_path = os.path.join(output_path, "fhir")
+        if not os.path.exists(fhir_path):
+            logger.warning(f"No FHIR output found at {fhir_path}")
+            return
+
+        bundle_files = glob.glob(os.path.join(fhir_path, "*.json"))
+        logger.info(f"Found {len(bundle_files)} FHIR bundles to import")
+
+        # Import each bundle
+        imported_count = 0
+        patient_count = 0
+
+        for bundle_file in bundle_files:
+            try:
+                with open(bundle_file, 'r') as f:
+                    bundle_data = json.load(f)
+
+                # Process bundle entries
+                if bundle_data.get("resourceType") == "Bundle" and "entry" in bundle_data:
+                    for entry in bundle_data.get("entry", []):
+                        resource = entry.get("resource", {})
+                        resource_type = resource.get("resourceType")
+
+                        if resource_type:
+                            # Generate resource ID if not present
+                            if "id" not in resource:
+                                resource["id"] = str(uuid.uuid4())
+
+                            # Add population identifier
+                            if "identifier" not in resource:
+                                resource["identifier"] = []
+                            resource["identifier"].append({
+                                "system": "http://synthea-studio/population",
+                                "value": population_id
+                            })
+
+                            # Save to PostgreSQL
+                            fhir_resource = FhirResource(
+                                resource_type=resource_type,
+                                resource_id=resource["id"],
+                                population_id=population_id,
+                                resource_data=resource
+                            )
+                            db.add(fhir_resource)
+                            imported_count += 1
+
+                            if resource_type == "Patient":
+                                patient_count += 1
+
+            except Exception as e:
+                logger.error(f"Error processing bundle file {bundle_file}: {e}")
+
+        # Commit all resources to database
+        db.commit()
+        logger.info(f"Import complete: {patient_count} patients, {imported_count} total resources for population {population_id}")
+
+        # Store import stats in Redis
+        redis_client.setex(
+            f"population:{population_id}:import_stats",
+            3600,
+            json.dumps({
+                "patient_count": patient_count,
+                "imported_count": imported_count,
+                "bundle_count": len(bundle_files),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to import patients for population {population_id}: {e}")
+    finally:
+        db.close()
 
 
 @celery_app.task

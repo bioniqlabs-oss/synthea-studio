@@ -1,189 +1,216 @@
 # Synthea Studio
 
-Open-source configuration UI for [Synthea™](https://github.com/synthetichealth/synthea) synthetic patient population generation.
+Web Interface for [Synthea™](https://github.com/synthetichealth/synthea) with Integrated EHR Simulation
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![CI](https://github.com/synthea-studio/synthea-studio/workflows/CI/badge.svg)](https://github.com/synthea-studio/synthea-studio/actions)
-[![Synthea](https://img.shields.io/badge/Powered%20by-Synthea-blue)](https://synthetichealth.github.io/synthea/)
+[![Powered by Synthea](https://img.shields.io/badge/Powered%20by-Synthea™-blue)](https://synthetichealth.github.io/synthea/)
 
 ## Overview
 
-Synthea Studio provides a modern web interface for configuring and generating synthetic patient populations using [Synthea™ Patient Generator](https://github.com/synthetichealth/synthea). It adds population management, job tracking, and batch operations on top of Synthea's powerful generation capabilities.
+Synthea Studio provides a modern web interface for [Synthea™ Patient Generator](https://github.com/synthetichealth/synthea) with integrated EHR simulation capabilities. It enables healthcare researchers, developers, and educators to generate realistic synthetic patient populations and test them in a simulated EHR environment.
+
+### Key Features
+
+- **🎨 Visual Population Builder** - Configure demographics, conditions, disease prevalence through an intuitive UI
+- **🏥 Integrated EHR Simulator** - Browse patients, query FHIR resources, test clinical workflows
+- **📊 Clinical Trial Configuration** - Set disease prevalence rates, generate only alive patients, configure social determinants
+- **⚡ Real-time Progress Tracking** - Monitor generation with WebSocket updates and progress bars
+- **🔍 Advanced FHIR Queries** - Built-in FHIR command tester with query presets and history
+- **💾 PostgreSQL FHIR Storage** - Efficient JSONB storage for FHIR resources with population tagging
+- **🚀 Async Processing** - Non-blocking generation using Celery workers
+- **📦 Multiple Export Formats** - FHIR R4, CSV, C-CDA, NDJSON
 
 ### About Synthea™
 
-[Synthea™](https://synthetichealth.github.io/synthea/) is a synthetic patient generator developed by [The MITRE Corporation](https://www.mitre.org/) that models the medical history of synthetic patients. It provides high-quality, synthetic, realistic but not real, patient data and associated health records covering every aspect of healthcare. The resulting data is free from cost, privacy, and security restrictions, enabling research with Health IT data that is otherwise legally or practically unavailable.
+[Synthea™](https://synthetichealth.github.io/synthea/) is a synthetic patient generator developed by [The MITRE Corporation](https://www.mitre.org/) that models the medical history of synthetic patients. The resulting data is free from cost, privacy, and security restrictions.
 
 **Learn more about Synthea:**
 - [Official Documentation](https://synthetichealth.github.io/synthea/)
 - [GitHub Repository](https://github.com/synthetichealth/synthea)
 - [Wiki & Tutorials](https://github.com/synthetichealth/synthea/wiki)
-- [Research Publications](https://synthetichealth.github.io/synthea/publications)
-- [Community Forum](https://groups.google.com/g/synthea)
-
-## Features
-
-- **Visual Population Builder** - Configure demographics, conditions, and modules through an intuitive UI
-- **Population Management** - Track, organize, and manage multiple synthetic populations
-- **Real-time Progress** - Monitor generation progress with WebSocket updates
-- **Batch Operations** - Generate, delete, or export populations in bulk
-- **Pre-built Templates** - Start quickly with templates for common research scenarios
-- **Job Tracking** - Full audit trail of generation jobs with configurations and logs
-- **Flexible Storage** - Support for local, S3, MinIO, and Azure storage backends
-- **Async Processing** - Non-blocking generation using Celery workers
 
 ## Quick Start
+
+### Prerequisites
+
+- Docker and Docker Compose
+- 8GB+ RAM recommended
+- 20GB+ free disk space for populations
 
 ### Using Docker (Recommended)
 
 ```bash
 # Clone the repository
-git clone https://github.com/synthea-studio/synthea-studio.git
+git clone https://github.com/bioniqlabs-oss/synthea-studio.git
 cd synthea-studio
 
-# Production mode (default)
+# Download Synthea JAR (required, not included in repo)
+cd backend
+./setup_synthea.sh
+cd ..
+
+# Start all services
 docker-compose up -d
 
-# Development mode (with hot-reload)
-docker-compose -f docker-compose.dev.yml up -d
-
-# Visit http://localhost:3001
+# Visit http://localhost:3000
 ```
 
-### Manual Setup
-
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --port 8001
-
-# Frontend
-cd frontend
-npm install
-npm start
-
-# Database
-docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:14
-
-# Redis (for Celery)
-docker run -d -p 6379:6379 redis:7
-```
+Services will be available at:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8001
+- FHIR Endpoint: http://localhost:8001/fhir
 
 ## Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   React UI   │────▶│  FastAPI     │────▶│   Synthea    │
-│  (Port 3001) │     │  (Port 8001) │     │   (Java)     │
-└──────────────┘     └──────────────┘     └──────────────┘
-                            │
-                     ┌──────┴──────┐
-                     ▼             ▼
-              ┌──────────┐  ┌──────────┐
-              │PostgreSQL│  │  Redis   │
-              └──────────┘  └──────────┘
+┌─────────────────┐     ┌──────────────┐     ┌──────────────┐
+│  React Frontend │────▶│  FastAPI     │────▶│   Synthea    │
+│  (Port 3000)    │     │  (Port 8001) │     │   (Java JAR) │
+└─────────────────┘     └──────────────┘     └──────────────┘
+         │                      │
+         │               ┌──────┴──────┐
+         └──────────────▶│  PostgreSQL │
+         WebSocket       │  with JSONB │
+                        └─────────────┘
+                               │
+                        ┌──────┴──────┐
+                        │    Redis    │
+                        │   (Celery)  │
+                        └─────────────┘
 ```
 
-## Population Concept
+### Technology Stack
 
-In Synthea Studio, a **population** represents a single generation run of Synthea with specific configuration. Each population:
-- Has a unique ID (e.g., `pop_20240112_diabetes_100`)
-- Maintains its generation configuration
-- Can be individually managed (view, export, delete)
-- Tracks all generated patients and their artifacts
+**Frontend:**
+- React with TypeScript
+- Vite build system
+- TailwindCSS for styling
+- React Query for data fetching
+- WebSocket for real-time updates
+
+**Backend:**
+- FastAPI (Python 3.9+)
+- SQLAlchemy with async support
+- Celery for background tasks
+- Redis for pub/sub and caching
+- PostgreSQL 15 with JSONB
+
+## Features in Detail
+
+### Population Generation
+
+Create populations with advanced configurations:
+
+```json
+{
+  "name": "Diabetes Clinical Trial",
+  "size": 100,
+  "config": {
+    "state": "Massachusetts",
+    "city": "Boston",
+    "age_range": [30, 80],
+    "only_alive": true,
+    "prevalence": {
+      "diabetes": 0.3,
+      "hypertension": 0.4,
+      "cardiovascular": 0.2
+    },
+    "modules": ["diabetes", "cardiovascular_disease"],
+    "enable_social_determinants": true,
+    "enable_us_core": true
+  }
+}
+```
+
+### EHR Simulator Features
+
+- **Patient Browser**: View all generated patients with demographics
+- **FHIR Resource Viewer**: Browse Conditions, Observations, Medications, etc.
+- **FHIR Query Tester**: Execute custom FHIR queries with presets:
+  - Search by condition code: `/Patient?_has:Condition:patient:code=44054006`
+  - Date range queries: `/Patient?birthdate=ge1944&birthdate=le2006`
+  - Include related resources: `/Patient?_include=Patient:organization`
+
+### Data Management
+
+- **Population Tagging**: All FHIR resources tagged with population ID
+- **Cascade Deletion**: Removing a population removes all associated data
+- **Manual Import**: Fallback option when auto-import fails
+- **Export Options**: FHIR bundles, NDJSON, CSV formats
 
 ## Configuration
 
 ### Environment Variables
 
+Create a `.env` file in the root directory:
+
 ```bash
-# Backend
-DATABASE_URL=postgresql://user:pass@localhost/synthea_studio
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/synthea_studio
+
+# Redis
 REDIS_URL=redis://localhost:6379
-STORAGE_BACKEND=local  # or 's3', 'minio', 'azure'
-STORAGE_PATH=/var/lib/synthea-studio/storage
 
-# Frontend
-REACT_APP_API_URL=http://localhost:8001
-REACT_APP_WS_URL=ws://localhost:8001
+# Storage
+STORAGE_PATH=/storage
+SYNTHEA_OUTPUT_PATH=/tmp/synthea-output
+
+# CORS (comma-separated origins)
+CORS_ORIGINS=http://localhost:3000,http://localhost:8001
+
+# Synthea
+SYNTHEA_JAR_PATH=/app/synthea/synthea-with-dependencies.jar
+SYNTHEA_DEFAULT_STATE=Massachusetts
 ```
 
-### Storage Backends
+### Docker Compose Configuration
 
-```python
-# Local (Development)
-STORAGE_BACKEND=local
-STORAGE_PATH=/path/to/storage
-
-# S3/MinIO
-STORAGE_BACKEND=s3
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_BUCKET=synthea-populations
-
-# Azure Blob Storage
-STORAGE_BACKEND=azure
-AZURE_CONNECTION_STRING=DefaultEndpointsProtocol=https;...
-AZURE_CONTAINER=synthea-populations
-```
+The `docker-compose.yml` includes:
+- PostgreSQL with persistent volume
+- Redis for Celery broker
+- Backend API with hot reload
+- Frontend with Vite dev server
+- Celery worker for async tasks
 
 ## API Examples
 
 ### Create a Population
 
 ```bash
-curl -X POST http://localhost:8001/api/populations \
+curl -X POST http://localhost:8001/api/populations/ \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Diabetes Study Q1 2024",
-    "size": 100,
+    "name": "Diabetes Study",
+    "size": 50,
     "config": {
+      "state": "Massachusetts",
+      "city": "Boston",
       "modules": ["diabetes"],
-      "age_range": [40, 70],
-      "gender_distribution": {"M": 0.5, "F": 0.5}
+      "prevalence": {
+        "diabetes": 0.3
+      }
     }
   }'
 ```
 
-### List Populations
+### Query FHIR Resources
 
 ```bash
-curl http://localhost:8001/api/populations
+# Get all patients with diabetes
+curl "http://localhost:8001/fhir/Patient?_has:Condition:patient:code=44054006"
+
+# Get specific patient
+curl "http://localhost:8001/fhir/Patient/123456"
+
+# Search conditions by population
+curl "http://localhost:8001/fhir/Condition?population_id=pop_20250919_001"
 ```
 
-### Delete a Population
+### Manual Import
 
 ```bash
-curl -X DELETE http://localhost:8001/api/populations/pop_20240112_001
-```
-
-## Integration with External Systems
-
-### Export to FHIR Server
-
-```python
-from synthea_studio import PopulationExporter
-
-exporter = PopulationExporter()
-exporter.export_to_fhir_server(
-    population_id="pop_20240112_001",
-    fhir_server_url="http://localhost:8080/fhir",
-    batch_size=10
-)
-```
-
-### Load into EHR Simulator
-
-```bash
-# Export population as FHIR bundles
-curl http://localhost:8001/api/populations/pop_20240112_001/export?format=fhir
-
-# Import into EHR simulator
-curl -X POST http://localhost:8080/api/import \
-  -H "Content-Type: application/json" \
-  -d '{"source": "http://localhost:8001/exports/pop_20240112_001.zip"}'
+# Trigger manual import for a population
+curl -X POST "http://localhost:8001/api/populations/pop_20250919_001/import"
 ```
 
 ## Development
@@ -192,12 +219,49 @@ curl -X POST http://localhost:8080/api/import \
 
 ```
 synthea-studio/
-├── frontend/          # React UI
-├── backend/           # FastAPI backend
-├── database/          # PostgreSQL migrations
-├── synthea/           # Synthea JAR and configs
-├── templates/         # Pre-built population templates
-└── docs/             # Documentation
+├── frontend/           # React TypeScript application
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── services/    # API clients
+│   │   └── App.tsx      # Main application
+│   └── package.json
+├── backend/            # FastAPI backend
+│   ├── app/
+│   │   ├── api/         # API endpoints
+│   │   ├── models/      # SQLAlchemy models
+│   │   ├── services/    # Business logic
+│   │   └── workers/     # Celery tasks
+│   └── requirements.txt
+├── storage/            # Generated populations (git-ignored)
+│   ├── populations/    # Population metadata
+│   └── exports/        # Export artifacts
+└── docker-compose.yml  # Container orchestration
+```
+
+### Running Locally for Development
+
+```bash
+# Backend
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+
+# Database
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:15-alpine
+
+# Redis
+docker run -d -p 6379:6379 redis:7-alpine
+
+# Celery Worker
+cd backend
+celery -A app.workers.celery_app worker --loglevel=info
 ```
 
 ### Running Tests
@@ -211,35 +275,30 @@ pytest
 cd frontend
 npm test
 
-# End-to-end tests
-docker-compose -f docker-compose.test.yml up
+# E2E tests
+npm run test:e2e
 ```
 
-### Building for Production
+## Troubleshooting
 
-```bash
-# Build and run production containers
-docker-compose build
-docker-compose up -d
+### Common Issues
 
-# Or build individually
-docker build -t synthea-studio/frontend:latest ./frontend
-docker build -t synthea-studio/backend:latest ./backend
-```
+1. **Synthea JAR not found**
+   - Run `./setup_synthea.sh` in the backend directory
+   - Or download manually from [Synthea releases](https://github.com/synthetichealth/synthea/releases)
 
-### Development Mode
+2. **Port conflicts**
+   - Frontend: Change port in `frontend/vite.config.ts`
+   - Backend: Update `VITE_API_URL` in frontend `.env`
 
-```bash
-# Run with hot-reload enabled for both frontend and backend
-docker-compose -f docker-compose.dev.yml up -d
+3. **Memory issues**
+   - Increase Docker memory allocation
+   - Reduce population size
+   - Clear old populations regularly
 
-# Frontend changes in src/ will auto-reload
-# Backend changes in app/ will auto-reload
-
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f frontend
-docker-compose -f docker-compose.dev.yml logs -f backend
-```
+4. **Import failures**
+   - Use "Manual Import" button in UI
+   - Check Celery logs: `docker logs synthea-celery`
 
 ## Contributing
 
@@ -260,25 +319,15 @@ This project builds upon the excellent work of:
 
 - **[Synthea™ Patient Generator](https://github.com/synthetichealth/synthea)** - The core synthetic patient generation engine
 - **[The MITRE Corporation](https://www.mitre.org/)** - Original creators and maintainers of Synthea
-- **[SyntheticHealth Community](https://groups.google.com/g/synthea)** - For continuous improvements and contributions
 
 ### Synthea License
 Synthea™ is a Trademark of The MITRE Corporation. Synthea is licensed under the Apache License, Version 2.0. This project (Synthea Studio) is an independent UI layer and is not affiliated with or endorsed by The MITRE Corporation.
 
 ## Support
 
-- [Documentation](https://synthea-studio.github.io/docs)
-- [Discussions](https://github.com/synthea-studio/synthea-studio/discussions)
-- [Issue Tracker](https://github.com/synthea-studio/synthea-studio/issues)
-
-## Roadmap
-
-- [ ] Phase 1: Core population management (Current)
-- [ ] Phase 2: Advanced configuration UI
-- [ ] Phase 3: Multi-tenancy support
-- [ ] Phase 4: Cloud deployment templates
-- [ ] Phase 5: Plugin system for custom modules
+- [Issue Tracker](https://github.com/bioniqlabs-oss/synthea-studio/issues)
+- [Discussions](https://github.com/bioniqlabs-oss/synthea-studio/discussions)
 
 ---
 
-**Note**: This project is not affiliated with MITRE Corporation or the official Synthea project. It's a community-driven UI layer built on top of Synthea.
+**Note**: This project is not affiliated with MITRE Corporation or the official Synthea project. It's an independent web interface built on top of Synthea.

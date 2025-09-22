@@ -1,6 +1,7 @@
 """
 Population management endpoints
 """
+import logging
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,8 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.models import Population
 from app.models.population import PopulationStatus
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -32,6 +35,7 @@ class PopulationResponse(BaseModel):
     config: dict
     created_at: datetime
     completed_at: Optional[datetime]
+    storage_path: Optional[str]
 
 
 @router.get("/", response_model=List[PopulationResponse])
@@ -59,7 +63,8 @@ async def list_populations(
             status=p.status.value,
             config=p.config,
             created_at=p.created_at,
-            completed_at=p.completed_at
+            completed_at=p.completed_at,
+            storage_path=p.storage_path
         )
         for p in populations
     ]
@@ -78,7 +83,7 @@ async def get_population(
     
     if not population:
         raise HTTPException(status_code=404, detail="Population not found")
-    
+
     return PopulationResponse(
         id=population.id,
         name=population.name,
@@ -87,7 +92,8 @@ async def get_population(
         status=population.status.value,
         config=population.config,
         created_at=population.created_at,
-        completed_at=population.completed_at
+        completed_at=population.completed_at,
+        storage_path=population.storage_path
     )
 
 
@@ -130,9 +136,27 @@ async def create_population(
     db.add(population)
     await db.commit()
     await db.refresh(population)
-    
-    # TODO: Trigger generation job via Celery
-    
+
+    # Trigger generation job via Celery
+    from app.workers.celery_app import celery_app
+    from app.models.job import GenerationJob
+
+    task = celery_app.send_task(
+        'app.workers.generation_worker.generate_population',
+        args=[population_id, population.patient_count, dict(population.config)]
+    )
+
+    # Create job record
+    job = GenerationJob(
+        population_id=population_id,
+        celery_task_id=task.id
+    )
+    db.add(job)
+
+    # Update population status
+    population.status = PopulationStatus.GENERATING
+    await db.commit()
+
     return PopulationResponse(
         id=population.id,
         name=population.name,
@@ -141,8 +165,77 @@ async def create_population(
         status=population.status.value,
         config=population.config,
         created_at=population.created_at,
-        completed_at=population.completed_at
+        completed_at=population.completed_at,
+        storage_path=population.storage_path
     )
+
+
+@router.get("/{population_id}/statistics")
+async def get_population_statistics(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get statistics for a specific population"""
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    # Return basic statistics for now
+    # In a real implementation, this would query FHIR data
+    return {
+        "population_id": population_id,
+        "patient_count": population.patient_count,
+        "status": population.status.value,
+        "created_at": population.created_at,
+        "completed_at": population.completed_at,
+        "demographics": {
+            "total": population.patient_count,
+            "by_gender": population.config.get("gender_distribution", {}),
+            "age_range": population.config.get("age_range", [0, 100])
+        },
+        "conditions": {
+            "modules_used": population.config.get("modules", [])
+        }
+    }
+
+
+@router.get("/{population_id}/status")
+async def get_population_status(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get generation status for a population"""
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    # Get associated job if exists
+    from app.models.job import GenerationJob
+    job_result = await db.execute(
+        select(GenerationJob)
+        .where(GenerationJob.population_id == population_id)
+        .order_by(GenerationJob.created_at.desc())
+        .limit(1)
+    )
+    job = job_result.scalar_one_or_none()
+
+    return {
+        "population_id": population_id,
+        "status": population.status.value,
+        "progress": job.progress if job else 0,
+        "created_at": population.created_at,
+        "completed_at": population.completed_at,
+        "job_id": str(job.id) if job else None,
+        "celery_task_id": job.celery_task_id if job else None
+    }
 
 
 @router.delete("/{population_id}")
@@ -159,18 +252,88 @@ async def delete_population(
     if not population:
         raise HTTPException(status_code=404, detail="Population not found")
     
-    # Delete related generation jobs first
-    from app.models import GenerationJob
-    await db.execute(
-        delete(GenerationJob).where(GenerationJob.population_id == population_id)
-    )
-    
-    # TODO: Delete storage artifacts
-    
-    # Now delete the population
-    await db.execute(
-        delete(Population).where(Population.id == population_id)
-    )
+    # Delete storage artifacts if they exist
+    if population.storage_path:
+        import shutil
+        from pathlib import Path
+        storage_path = Path(population.storage_path)
+        if storage_path.exists():
+            try:
+                shutil.rmtree(storage_path)
+                logger.info(f"Deleted storage artifacts at {storage_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete storage artifacts: {e}")
+                # Continue with deletion even if file cleanup fails
+
+    # Delete the population (cascade will handle related records)
+    await db.delete(population)
     await db.commit()
-    
+
+    logger.info(f"Successfully deleted population {population_id}")
     return {"message": f"Population {population_id} deleted successfully"}
+
+
+@router.post("/{population_id}/import")
+async def import_population(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually trigger import of population data to FHIR database.
+    Useful when auto-import fails during generation.
+    """
+    # Verify population exists
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    if population.status != PopulationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Population must be COMPLETED to import. Current status: {population.status}"
+        )
+
+    if not population.storage_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Population has no storage path. Generation may have failed."
+        )
+
+    # Check if already imported by counting existing FHIR resources
+    from app.models.fhir_resource import FhirResource
+    from sqlalchemy import func
+
+    existing_count_result = await db.execute(
+        select(func.count(FhirResource.id))
+        .where(FhirResource.population_id == population_id)
+    )
+    existing_count = existing_count_result.scalar()
+
+    if existing_count > 0:
+        return {
+            "message": f"Population {population.name} already has {existing_count} FHIR resources imported",
+            "population_id": population_id,
+            "already_imported": True,
+            "resource_count": existing_count
+        }
+
+    # Trigger import via Celery task
+    from app.workers.celery_app import celery_app
+
+    task = celery_app.send_task(
+        'app.workers.generation_worker.import_patients_to_fhir_task',
+        args=[population_id, population.storage_path]
+    )
+
+    logger.info(f"Triggered manual import for population {population_id}, task: {task.id}")
+
+    return {
+        "message": f"Import started for population {population.name} ({population.patient_count} patients)",
+        "task_id": task.id,
+        "population_id": population_id,
+        "patient_count": population.patient_count
+    }

@@ -18,7 +18,7 @@ class PopulationStatus(str, enum.Enum):
 
 class Population(Base):
     __tablename__ = "populations"
-    
+
     id = Column(String, primary_key=True)  # pop_20240112_001
     name = Column(String, nullable=False)
     description = Column(String)
@@ -28,6 +28,9 @@ class Population(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
     storage_path = Column(String)  # Path to stored artifacts
+
+    # Relationship to FHIR resources
+    fhir_resources = relationship("app.models.fhir_resource.FhirResource", back_populates="population", cascade="all, delete-orphan")
     
     # Relationships
     jobs = relationship("GenerationJob", back_populates="population", cascade="all, delete-orphan")

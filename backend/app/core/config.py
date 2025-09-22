@@ -1,7 +1,7 @@
 """
 Application configuration
 """
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings
 
 
@@ -18,15 +18,19 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     
     # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3001",
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:5173",
+        "http://localhost:3080",
         "https://synthea-studio.github.io"
     ]
     
     # Storage
     STORAGE_BACKEND: str = "local"  # local, s3, minio, azure
-    STORAGE_PATH: str = "/var/lib/synthea-studio/storage"
+    STORAGE_PATH: str = "/storage"  # Docker volume mapped to ./storage
     
     # S3/MinIO settings
     S3_ENDPOINT: str = "http://localhost:9000"
