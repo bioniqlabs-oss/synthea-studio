@@ -78,11 +78,19 @@ export default function PopulationDashboard() {
   };
 
   // Handle manual import
-  const handleManualImport = async (id: string, outputPath: string) => {
+  const handleManualImport = async (id: string) => {
     try {
-      await populationApi.import(id, outputPath);
-      toast.success('Import started');
+      const result = await populationApi.import(id);
+      toast.success(result.message || 'Import started - please wait a few seconds for data to appear');
+      // Refresh population data to update resource counts
       queryClient.invalidateQueries({ queryKey: ['populations'] });
+      queryClient.invalidateQueries({ queryKey: ['population', id] });
+      queryClient.invalidateQueries({ queryKey: ['population-stats', id] });
+      // Also refresh EHR patients list after a delay to allow import to complete
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['ehr-patients'] });
+        queryClient.invalidateQueries({ queryKey: ['fhir-resources'] });
+      }, 3000); // Wait 3 seconds for import to complete
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to start import');
     }

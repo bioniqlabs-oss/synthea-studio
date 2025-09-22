@@ -196,6 +196,52 @@ def generate_population(
             db.close()
 
 
+@celery_app.task
+def import_patients_to_fhir_task(population_id: str, output_path: str):
+    """
+    Celery task to manually import FHIR data for a population
+
+    Args:
+        population_id: Population ID
+        output_path: Path to generated FHIR files
+
+    Returns:
+        Dict with import results
+    """
+    try:
+        logger.info(f"Starting manual import for population {population_id}")
+        import_patients_to_fhir(population_id, output_path)
+
+        # Count imported resources
+        db = SessionLocal()
+        try:
+            from app.models.fhir_resource import FhirResource
+            resource_count = db.query(FhirResource).filter_by(population_id=population_id).count()
+            patient_count = db.query(FhirResource).filter_by(
+                population_id=population_id,
+                resource_type="Patient"
+            ).count()
+        finally:
+            db.close()
+
+        logger.info(f"Successfully imported {patient_count} patients, {resource_count} total resources for population {population_id}")
+
+        return {
+            "success": True,
+            "population_id": population_id,
+            "patient_count": patient_count,
+            "resource_count": resource_count,
+            "message": f"Imported {patient_count} patients and {resource_count} total FHIR resources"
+        }
+    except Exception as e:
+        logger.error(f"Manual import failed for population {population_id}: {str(e)}")
+        return {
+            "success": False,
+            "population_id": population_id,
+            "error": str(e)
+        }
+
+
 def import_patients_to_fhir(population_id: str, output_path: str):
     """
     Import generated FHIR bundles into PostgreSQL

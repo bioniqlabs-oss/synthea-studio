@@ -122,6 +122,54 @@ class SyntheaWrapper:
             logger.error(f"Synthea generation failed: {str(e)}")
             raise
     
+    def _create_properties_file(self, config: Dict[str, Any], output_path: Path) -> Optional[Path]:
+        """Create a properties file for advanced Synthea configuration"""
+        props_needed = False
+        props_content = []
+
+        # Check if we need a properties file
+        if config.get("only_alive", False):
+            props_content.append("generate.only_alive_patients = true")
+            props_needed = True
+
+        # Disease prevalence settings
+        prevalence = config.get("prevalence", {})
+        if prevalence.get("diabetes", 0) > 0:
+            props_content.append(f"generate.diabetes.prevalence = {prevalence['diabetes']}")
+            props_needed = True
+        if prevalence.get("hypertension", 0) > 0:
+            props_content.append(f"generate.hypertension.prevalence = {prevalence['hypertension']}")
+            props_needed = True
+        if prevalence.get("cardiovascular", 0) > 0:
+            props_content.append(f"generate.cardiovascular_disease.prevalence = {prevalence['cardiovascular']}")
+            props_needed = True
+        if prevalence.get("obesity", 0) > 0:
+            props_content.append(f"generate.obesity.prevalence = {prevalence['obesity']}")
+            props_needed = True
+
+        # FHIR Extensions
+        if config.get("enable_social_determinants", False):
+            props_content.append("exporter.fhir.extensions.social_determinants = true")
+            props_needed = True
+        if config.get("enable_us_core", False):
+            props_content.append("exporter.fhir.extensions.us_core = true")
+            props_needed = True
+        if config.get("expanded_observations", False):
+            props_content.append("exporter.fhir.observation.value_sets = expanded")
+            props_needed = True
+
+        if not props_needed:
+            return None
+
+        # Write properties file
+        props_file = output_path / "synthea.properties"
+        with open(props_file, "w") as f:
+            f.write("\n".join(props_content))
+            f.write("\n")
+
+        logger.info(f"Created properties file with content:\n{chr(10).join(props_content)}")
+        return props_file
+
     def _build_command(
         self,
         size: int,
@@ -129,6 +177,9 @@ class SyntheaWrapper:
         output_path: Path
     ) -> List[str]:
         """Build Synthea command line arguments"""
+        # Create properties file if needed
+        props_file = self._create_properties_file(config, output_path)
+
         cmd = [
             "java",
             "-jar",
@@ -136,6 +187,10 @@ class SyntheaWrapper:
             "-p", str(size),  # Population size
             f"--exporter.baseDirectory={str(output_path)}"
         ]
+
+        # Add properties file if created
+        if props_file:
+            cmd.extend(["-c", str(props_file)])
         
         # Add optional parameters
         if config.get("seed"):

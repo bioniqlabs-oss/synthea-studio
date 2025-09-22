@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import PopulationDashboard from './components/PopulationDashboard';
 import ServiceHealth from './components/ServiceHealth';
 import EHRSimulator from './components/EHRSimulator';
+import About from './components/About';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -21,7 +22,7 @@ const queryClient = new QueryClient({
   },
 });
 
-type TabType = 'populations' | 'ehr' | 'health' | 'analytics';
+type TabType = 'populations' | 'ehr' | 'health' | 'analytics' | 'about';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('populations');
@@ -36,7 +37,16 @@ function App() {
               <div className="flex items-center space-x-4">
                 <h1 className="text-2xl font-bold text-gray-900">Synthea Studio</h1>
                 <span className="text-sm text-gray-500">
-                  Synthetic Patient Generation Platform
+                  Web Interface for{' '}
+                  <a
+                    href="https://synthetichealth.github.io/synthea/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Synthea™
+                  </a>
+                  {' '}with Integrated EHR Simulation
                 </span>
               </div>
               <div className="flex items-center space-x-4">
@@ -90,6 +100,16 @@ function App() {
               >
                 Analytics
               </button>
+              <button
+                onClick={() => setActiveTab('about')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
+                  activeTab === 'about'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                About
+              </button>
             </div>
           </div>
         </nav>
@@ -109,6 +129,7 @@ function App() {
               </p>
             </div>
           )}
+          {activeTab === 'about' && <About />}
         </main>
 
         {/* Toast notifications */}

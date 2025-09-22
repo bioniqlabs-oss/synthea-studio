@@ -30,6 +30,18 @@ export default function PopulationForm({ onSubmit, onCancel, isLoading }: Popula
       reference_date: '',
       end_date: '',
       overflow_population: 0,
+      // Clinical Trial Settings
+      only_alive: false,
+      prevalence: {
+        diabetes: 0,
+        hypertension: 0,
+        cardiovascular: 0,
+        obesity: 0,
+      },
+      // FHIR Extensions
+      enable_social_determinants: false,
+      enable_us_core: false,
+      expanded_observations: false,
     },
   });
 
@@ -352,6 +364,186 @@ export default function PopulationForm({ onSubmit, onCancel, isLoading }: Popula
               <p className="text-xs text-gray-500 mt-1">
                 Additional synthetic records beyond the target population
               </p>
+            </div>
+
+            {/* Clinical Trial Settings */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Clinical Trial Settings</h3>
+
+              <div className="mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.config.only_alive}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, only_alive: e.target.checked },
+                      })
+                    }
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Generate only alive patients</span>
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-700">Disease Prevalence (0-1)</h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Diabetes</label>
+                    <input
+                      type="number"
+                      value={formData.config.prevalence.diabetes}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            prevalence: {
+                              ...formData.config.prevalence,
+                              diabetes: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      placeholder="0.3 (30%)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Hypertension</label>
+                    <input
+                      type="number"
+                      value={formData.config.prevalence.hypertension}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            prevalence: {
+                              ...formData.config.prevalence,
+                              hypertension: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      placeholder="0.4 (40%)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Cardiovascular</label>
+                    <input
+                      type="number"
+                      value={formData.config.prevalence.cardiovascular}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            prevalence: {
+                              ...formData.config.prevalence,
+                              cardiovascular: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      placeholder="0.2 (20%)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Obesity</label>
+                    <input
+                      type="number"
+                      value={formData.config.prevalence.obesity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          config: {
+                            ...formData.config,
+                            prevalence: {
+                              ...formData.config.prevalence,
+                              obesity: parseFloat(e.target.value) || 0,
+                            },
+                          },
+                        })
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      placeholder="0.35 (35%)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FHIR Extensions */}
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">FHIR Extensions</h3>
+
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.config.enable_social_determinants}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, enable_social_determinants: e.target.checked },
+                      })
+                    }
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Include social determinants of health</span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.config.enable_us_core}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, enable_us_core: e.target.checked },
+                      })
+                    }
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Enable US Core profiles</span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.config.expanded_observations}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        config: { ...formData.config, expanded_observations: e.target.checked },
+                      })
+                    }
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Use expanded observation value sets</span>
+                </label>
+              </div>
             </div>
           </div>
         )}

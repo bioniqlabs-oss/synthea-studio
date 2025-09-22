@@ -15,7 +15,7 @@ import {
 
 interface PopulationDetailsProps {
   populationId: string;
-  onImport: (id: string, outputPath: string) => void;
+  onImport: (id: string) => void;
   onExport?: (id: string, format: 'fhir' | 'csv' | 'ccda' | 'ndjson') => void;
 }
 
@@ -85,8 +85,9 @@ export default function PopulationDetails({ populationId, onImport, onExport }: 
             <div className="flex gap-2">
               {population.storage_path && (
                 <button
-                  onClick={() => onImport(population.id, population.storage_path)}
+                  onClick={() => onImport(population.id)}
                   className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition"
+                  title="Import FHIR data to database if auto-import failed"
                 >
                   Manual Import
                 </button>

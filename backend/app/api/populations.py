@@ -35,6 +35,7 @@ class PopulationResponse(BaseModel):
     config: dict
     created_at: datetime
     completed_at: Optional[datetime]
+    storage_path: Optional[str]
 
 
 @router.get("/", response_model=List[PopulationResponse])
@@ -62,7 +63,8 @@ async def list_populations(
             status=p.status.value,
             config=p.config,
             created_at=p.created_at,
-            completed_at=p.completed_at
+            completed_at=p.completed_at,
+            storage_path=p.storage_path
         )
         for p in populations
     ]
@@ -81,7 +83,7 @@ async def get_population(
     
     if not population:
         raise HTTPException(status_code=404, detail="Population not found")
-    
+
     return PopulationResponse(
         id=population.id,
         name=population.name,
@@ -90,7 +92,8 @@ async def get_population(
         status=population.status.value,
         config=population.config,
         created_at=population.created_at,
-        completed_at=population.completed_at
+        completed_at=population.completed_at,
+        storage_path=population.storage_path
     )
 
 
@@ -162,7 +165,8 @@ async def create_population(
         status=population.status.value,
         config=population.config,
         created_at=population.created_at,
-        completed_at=population.completed_at
+        completed_at=population.completed_at,
+        storage_path=population.storage_path
     )
 
 
@@ -267,3 +271,69 @@ async def delete_population(
 
     logger.info(f"Successfully deleted population {population_id}")
     return {"message": f"Population {population_id} deleted successfully"}
+
+
+@router.post("/{population_id}/import")
+async def import_population(
+    population_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually trigger import of population data to FHIR database.
+    Useful when auto-import fails during generation.
+    """
+    # Verify population exists
+    result = await db.execute(
+        select(Population).where(Population.id == population_id)
+    )
+    population = result.scalar_one_or_none()
+
+    if not population:
+        raise HTTPException(status_code=404, detail="Population not found")
+
+    if population.status != PopulationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Population must be COMPLETED to import. Current status: {population.status}"
+        )
+
+    if not population.storage_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Population has no storage path. Generation may have failed."
+        )
+
+    # Check if already imported by counting existing FHIR resources
+    from app.models.fhir_resource import FhirResource
+    from sqlalchemy import func
+
+    existing_count_result = await db.execute(
+        select(func.count(FhirResource.id))
+        .where(FhirResource.population_id == population_id)
+    )
+    existing_count = existing_count_result.scalar()
+
+    if existing_count > 0:
+        return {
+            "message": f"Population {population.name} already has {existing_count} FHIR resources imported",
+            "population_id": population_id,
+            "already_imported": True,
+            "resource_count": existing_count
+        }
+
+    # Trigger import via Celery task
+    from app.workers.celery_app import celery_app
+
+    task = celery_app.send_task(
+        'app.workers.generation_worker.import_patients_to_fhir_task',
+        args=[population_id, population.storage_path]
+    )
+
+    logger.info(f"Triggered manual import for population {population_id}, task: {task.id}")
+
+    return {
+        "message": f"Import started for population {population.name} ({population.patient_count} patients)",
+        "task_id": task.id,
+        "population_id": population_id,
+        "patient_count": population.patient_count
+    }

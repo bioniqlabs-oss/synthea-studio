@@ -6,7 +6,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import { toast } from 'react-hot-toast';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 const API_TIMEOUT = 30000;
 
 // Create axios instance
@@ -118,11 +118,8 @@ export const populationApi = {
   },
 
   // Manual import
-  import: async (id: string, outputPath: string) => {
-    const response = await apiClient.post(`/api/populations/${id}/import`, {
-      population_id: id,
-      output_path: outputPath,
-    });
+  import: async (id: string) => {
+    const response = await apiClient.post(`/api/populations/${id}/import`);
     return response.data;
   },
 
